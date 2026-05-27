@@ -14,4 +14,5 @@ COPY . .
 EXPOSE 8787
 
 # D1のローカルDBを初期化し、Wranglerを0.0.0.0でリッスンさせて起動
-CMD npx wrangler d1 execute estat_db --local --file=./schema.sql && npx wrangler dev --ip 0.0.0.0
+CMD npx wrangler d1 migrations apply estat_db --local && \
+    npx wrangler dev --ip 0.0.0.0
