@@ -1,0 +1,11 @@
+name = "estat-healthcheck-backend"
+main = "src/index.ts"
+compatibility_date = "2024-05-20"
+
+[triggers]
+crons = ["*/10 * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "estat_db"
+database_id = "DATABASE_ID"
