@@ -7,5 +7,5 @@ crons = ["*/10 * * * *"]
 
 [[d1_databases]]
 binding = "DB"
-database_name = "estat_db"
-database_id = "DATABASE_ID"
+database_name = "estat_health_history"
+database_id = "2867db9a-c3b5-4995-b127-36434b8a5ad1"
