@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "sh -c 'echo y | wrangler d1 migrations apply estat_health_history --local && wrangler dev --ip 0.0.0.0'",
     "deploy": "wrangler deploy"
   },
   "dependencies": {
