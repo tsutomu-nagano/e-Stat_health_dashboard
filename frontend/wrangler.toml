@@ -1,4 +1,4 @@
-name = "estat-health-dashboard"
+name = 'e-stat-health-dashboard'
 
 pages_build_output_dir = "dist"
 compatibility_date = "2026-05-27"
