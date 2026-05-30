@@ -7,7 +7,7 @@ interface CheckResult {
   status: 'up' | 'down';
   statusCode?: number;
   responseTimeMs?: number;
-  lastChecked: string;
+  createdAt: string;
   error?: string;
 }
 
