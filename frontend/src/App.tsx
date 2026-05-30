@@ -30,8 +30,6 @@ function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [timeRange, setTimeRange] = useState<number>(24); // hours
 
-  console.log(API_BASE_URL)
-
   const fetchData = async () => {
     try {
       const [statusRes, historyRes] = await Promise.all([
@@ -173,7 +171,7 @@ function App() {
                     <div className="info-row">
                       <span className="label">Last Checked</span>
                       <span className="value">
-                        {new Date(result.lastChecked).toLocaleTimeString()}
+                        {new Date(result.createdAt).toLocaleTimeString()}
                       </span>
                     </div>
                   </div>
