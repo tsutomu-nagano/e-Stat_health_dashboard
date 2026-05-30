@@ -171,9 +171,13 @@ function App() {
                     <div className="info-row">
                       <span className="label">Last Checked</span>
                       <span className="value">
-                        {new Date(result.createdAt).toLocaleTimeString("ja-JP", {
-                          timeZone: "Asia/Tokyo",
-                        })}
+                        {
+                          new Date(
+                            result.createdAt.replace(" ", "T") + "Z"
+                          ).toLocaleTimeString("ja-JP", {
+                            timeZone: "Asia/Tokyo",
+                          })
+                        }
                       </span>
                     </div>
                   </div>
