@@ -28,7 +28,7 @@ function App() {
   const [history, setHistory] = useState<HistoryLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [timeRange, setTimeRange] = useState<number>(24); // hours
+  const [timeRange, setTimeRange] = useState<number>(1); // hours
 
   const fetchData = async () => {
     try {
@@ -171,7 +171,9 @@ function App() {
                     <div className="info-row">
                       <span className="label">Last Checked</span>
                       <span className="value">
-                        {new Date(result.createdAt).toLocaleTimeString()}
+                        {new Date(result.createdAt).toLocaleTimeString("ja-JP", {
+                          timeZone: "Asia/Tokyo",
+                        })}
                       </span>
                     </div>
                   </div>
