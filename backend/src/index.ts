@@ -36,7 +36,7 @@ app.post('/api/check-now', async (c) => {
 
 app.get('/api/history', async (c) => {
   const { results } = await c.env.DB.prepare(`
-    SELECT * FROM logs ORDER BY createdAt DESC LIMIT 288
+    SELECT * FROM logs ORDER BY createdAt DESC LIMIT 864
   `).all();
   
   return c.json({
