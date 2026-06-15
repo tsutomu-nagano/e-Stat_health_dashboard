@@ -196,7 +196,7 @@ function App() {
                 <div className="chart-header">
                   <h2>Response Time History</h2>
                   <div className="range-selector">
-                    {[1, 6, 12, 24].map((hours) => (
+                    {[1, 6, 12, 24, 48, 72].map((hours) => (
                       <button
                         key={hours}
                         className={`range-btn ${timeRange === hours ? 'active' : ''}`}
