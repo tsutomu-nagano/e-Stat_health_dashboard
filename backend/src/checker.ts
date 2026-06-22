@@ -1,3 +1,5 @@
+import targetsConfig from './check-targets.json';
+
 export interface CheckResult {
   target: string;
   status: 'up' | 'down';
@@ -7,71 +9,85 @@ export interface CheckResult {
   error?: string;
 }
 
-const ESTAT_WEB_URL = 'https://www.e-stat.go.jp/';
+type TargetConfig = {
+  id: string;
+  name: string;
+  type: 'http' | 'estat-api';
+  url: string;
+  acceptableStatusCodes?: number[];
+};
 
-export const checkEndpoints = async (env: { DB: any; ESTAT_APP_ID: string }) => {
-  const ESTAT_API_URL = `https://api.e-stat.go.jp/rest/3.0/app/json/getStatsList?appId=${env.ESTAT_APP_ID}&statsNameList=Y`;
-  
-  const results = { web: null as any, api: null as any };
+type Env = {
+  DB: any;
+  ESTAT_APP_ID?: string;
+};
 
-  try {
-    const start = Date.now();
-    const res = await fetch(ESTAT_WEB_URL);
-    const end = Date.now();
-    results.web = {
-      target: 'e-Stat Web',
-      status: res.status === 200 ? 'up' : 'down',
-      statusCode: res.status,
-      responseTimeMs: end - start,
-      lastChecked: new Date().toISOString()
-    };
-    await env.DB.prepare(
-      `INSERT INTO logs (target, status, statusCode, responseTimeMs, error) VALUES (?, ?, ?, ?, ?)`
-    ).bind(results.web.target, results.web.status, results.web.statusCode, results.web.responseTimeMs, null).run();
-  } catch (err: any) {
-    results.web = {
-      target: 'e-Stat Web',
-      status: 'down',
-      statusCode: null,
-      lastChecked: new Date().toISOString(),
-      error: err.message
-    };
-    await env.DB.prepare(
-      `INSERT INTO logs (target, status, statusCode, responseTimeMs, error) VALUES (?, ?, ?, ?, ?)`
-    ).bind(results.web.target, results.web.status, null, null, results.web.error).run();
-  }
+const targets = targetsConfig.targets as TargetConfig[];
+
+const saveResult = async (env: Env, result: CheckResult) => {
+  await env.DB.prepare(
+    `INSERT INTO logs (target, status, statusCode, responseTimeMs, error) VALUES (?, ?, ?, ?, ?)`
+  ).bind(
+    result.target,
+    result.status,
+    result.statusCode ?? null,
+    result.responseTimeMs ?? null,
+    result.error ?? null
+  ).run();
+};
+
+const checkTarget = async (env: Env, target: TargetConfig): Promise<CheckResult> => {
+  const lastChecked = new Date().toISOString();
 
   try {
-    if (!env.ESTAT_APP_ID) {
+    if (target.type === 'estat-api' && !env.ESTAT_APP_ID) {
       throw new Error('ESTAT_APP_ID is not set in env');
     }
-    const start = Date.now();
-    const res = await fetch(ESTAT_API_URL);
-    const end = Date.now();
-    const data: any = await res.json();
-    results.api = {
-      target: 'e-Stat API',
-      status: data?.GET_STATS_LIST?.RESULT?.STATUS === 0 ? 'up' : 'down',
-      statusCode: res.status,
-      responseTimeMs: end - start,
-      lastChecked: new Date().toISOString(),
-      error: data?.GET_STATS_LIST?.RESULT?.STATUS !== 0 ? data?.GET_STATS_LIST?.RESULT?.ERROR_MSG : undefined
-    };
-    await env.DB.prepare(
-      `INSERT INTO logs (target, status, statusCode, responseTimeMs, error) VALUES (?, ?, ?, ?, ?)`
-    ).bind(results.api.target, results.api.status, results.api.statusCode, results.api.responseTimeMs, results.api.error || null).run();
-  } catch (err: any) {
-    results.api = {
-      target: 'e-Stat API',
-      status: 'down',
-      statusCode: null,
-      lastChecked: new Date().toISOString(),
-      error: err.message
-    };
-    await env.DB.prepare(
-      `INSERT INTO logs (target, status, statusCode, responseTimeMs, error) VALUES (?, ?, ?, ?, ?)`
-    ).bind(results.api.target, results.api.status, null, null, results.api.error).run();
-  }
 
-  return results;
+    const url = target.url.replace(
+      '{ESTAT_APP_ID}',
+      encodeURIComponent(env.ESTAT_APP_ID ?? '')
+    );
+    const start = Date.now();
+    const response = await fetch(url);
+    const responseTimeMs = Date.now() - start;
+    const expectedStatus = target.acceptableStatusCodes ?? [200];
+    let status: CheckResult['status'] = expectedStatus.includes(response.status) ? 'up' : 'down';
+    let error: string | undefined;
+
+    if (target.type === 'estat-api') {
+      const data: any = await response.json();
+      if (data?.GET_STATS_LIST?.RESULT?.STATUS !== 0) {
+        status = 'down';
+        error = data?.GET_STATS_LIST?.RESULT?.ERROR_MSG ?? 'e-Stat API returned an error';
+      }
+    }
+
+    if (status === 'down' && !error) {
+      error = `Unexpected HTTP status: ${response.status}`;
+    }
+
+    const result: CheckResult = {
+      target: target.name,
+      status,
+      statusCode: response.status,
+      responseTimeMs,
+      lastChecked,
+      error
+    };
+    await saveResult(env, result);
+    return result;
+  } catch (err: any) {
+    const result: CheckResult = {
+      target: target.name,
+      status: 'down',
+      lastChecked,
+      error: err instanceof Error ? err.message : String(err)
+    };
+    await saveResult(env, result);
+    return result;
+  }
 };
+
+export const checkEndpoints = async (env: Env): Promise<CheckResult[]> =>
+  Promise.all(targets.map((target) => checkTarget(env, target)));
