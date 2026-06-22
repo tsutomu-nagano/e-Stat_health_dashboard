@@ -8,6 +8,7 @@ type Bindings = {
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 app.use('/api/*', cors({
   origin: '*',
@@ -42,10 +43,30 @@ app.post('/api/check-now', async (c) => {
 });
 
 app.get('/api/history', async (c) => {
-  const { results } = await c.env.DB.prepare(`
-    SELECT * FROM logs ORDER BY createdAt DESC LIMIT 3456
-  `).all();
+  const startDate = c.req.query('startDate');
+  const endDate = c.req.query('endDate');
 
+  if ((startDate || endDate) && (!startDate || !endDate || !DATE_PATTERN.test(startDate) || !DATE_PATTERN.test(endDate) || startDate > endDate)) {
+    return c.json({
+      success: false,
+      error: 'startDate and endDate must be YYYY-MM-DD values, with startDate on or before endDate.'
+    }, 400);
+  }
+
+  const query = startDate && endDate
+    ? c.env.DB.prepare(`
+        SELECT *
+        FROM logs
+        WHERE createdAt >= datetime(? || ' 00:00:00', '-9 hours')
+          AND createdAt < datetime(? || ' 00:00:00', '+15 hours')
+        ORDER BY createdAt DESC
+        LIMIT 20000
+      `).bind(startDate, endDate)
+    : c.env.DB.prepare(`
+        SELECT * FROM logs ORDER BY createdAt DESC LIMIT 3456
+      `);
+
+  const { results } = await query.all();
   return c.json({
     success: true,
     data: results
