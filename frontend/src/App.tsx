@@ -24,19 +24,32 @@ interface HistoryLog {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#a855f7', '#ec4899', '#06b6d4'];
+const todayInJapan = () => new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Tokyo',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+}).format(new Date());
 
 function App() {
+  const today = todayInJapan();
   const [results, setResults] = useState<CheckResult[]>([]);
   const [history, setHistory] = useState<HistoryLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [timeRange, setTimeRange] = useState<number>(1);
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
+
+  const historyUrl = () => {
+    const params = new URLSearchParams({ startDate, endDate });
+    return `${API_BASE_URL}/api/history?${params.toString()}`;
+  };
 
   const fetchData = async () => {
     try {
       const [statusRes, historyRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/status`),
-        fetch(`${API_BASE_URL}/api/history`)
+        fetch(historyUrl())
       ]);
       const statusJson = await statusRes.json();
       const historyJson = await historyRes.json();
@@ -57,7 +70,7 @@ function App() {
       const json = await res.json();
       if (json.success) {
         setResults(json.data);
-        const historyRes = await fetch(`${API_BASE_URL}/api/history`);
+        const historyRes = await fetch(historyUrl());
         const historyJson = await historyRes.json();
         if (historyJson.success) setHistory(historyJson.data);
       }
@@ -72,18 +85,18 @@ function App() {
     fetchData();
     const interval = setInterval(fetchData, 600000);
     return () => clearInterval(interval);
-  }, []);
+  }, [startDate, endDate]);
 
   const chartDataMap = new Map<string, Record<string, string | number | null>>();
-  const cutoffTime = Date.now() - timeRange * 60 * 60 * 1000;
+  const isMultiDay = startDate !== endDate;
 
   [...history].reverse().forEach(log => {
     const logDate = new Date(log.createdAt + 'Z');
-    if (logDate.getTime() < cutoffTime) return;
-
     const coeff = 1000 * 60 * 10;
     const roundedDate = new Date(Math.round(logDate.getTime() / coeff) * coeff);
-    const time = roundedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const time = isMultiDay
+      ? roundedDate.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : roundedDate.toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' });
 
     if (!chartDataMap.has(time)) {
       chartDataMap.set(time, { time });
@@ -93,6 +106,16 @@ function App() {
 
   const chartData = Array.from(chartDataMap.values());
   const chartTargets = Array.from(new Set(history.map(log => log.target)));
+
+  const updateStartDate = (value: string) => {
+    setStartDate(value);
+    if (value > endDate) setEndDate(value);
+  };
+
+  const updateEndDate = (value: string) => {
+    setEndDate(value);
+    if (value < startDate) setStartDate(value);
+  };
 
   return (
     <div className="container">
@@ -162,22 +185,23 @@ function App() {
                 );
               })}
             </div>
-            {chartData.length > 0 && (
-              <div className="chart-container">
-                <div className="chart-header">
-                  <h2>Response Time History</h2>
-                  <div className="range-selector">
-                    {[1, 6, 12, 24, 48, 72].map((hours) => (
-                      <button
-                        key={hours}
-                        className={`range-btn ${timeRange === hours ? 'active' : ''}`}
-                        onClick={() => setTimeRange(hours)}
-                      >
-                        {hours}H
-                      </button>
-                    ))}
-                  </div>
+
+            <div className="chart-container">
+              <div className="chart-header">
+                <h2>Response Time History</h2>
+                <div className="date-range-selector">
+                  <label>
+                    開始日
+                    <input type="date" value={startDate} max={endDate} onChange={(event) => updateStartDate(event.target.value)} />
+                  </label>
+                  <span>〜</span>
+                  <label>
+                    終了日
+                    <input type="date" value={endDate} min={startDate} max={today} onChange={(event) => updateEndDate(event.target.value)} />
+                  </label>
                 </div>
+              </div>
+              {chartData.length > 0 ? (
                 <div className="chart-wrapper">
                   <ResponsiveContainer width="100%" height={300}>
                     <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
@@ -195,8 +219,10 @@ function App() {
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="empty-history">選択した期間の履歴データはありません。</div>
+              )}
+            </div>
           </>
         )}
         <span>このサービスは、政府統計総合窓口(e-Stat)のAPI機能を使用していますが、サービスの内容は国によって保証されたものではありません。</span>
