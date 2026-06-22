@@ -7,7 +7,8 @@ interface CheckResult {
   status: 'up' | 'down';
   statusCode?: number;
   responseTimeMs?: number;
-  createdAt: string;
+  createdAt?: string;
+  lastChecked?: string;
   error?: string;
 }
 
@@ -22,13 +23,14 @@ interface HistoryLog {
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#a855f7', '#ec4899', '#06b6d4'];
 
 function App() {
   const [results, setResults] = useState<CheckResult[]>([]);
   const [history, setHistory] = useState<HistoryLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [timeRange, setTimeRange] = useState<number>(1); // hours
+  const [timeRange, setTimeRange] = useState<number>(1);
 
   const fetchData = async () => {
     try {
@@ -55,7 +57,6 @@ function App() {
       const json = await res.json();
       if (json.success) {
         setResults(json.data);
-        // Refresh history too
         const historyRes = await fetch(`${API_BASE_URL}/api/history`);
         const historyJson = await historyRes.json();
         if (historyJson.success) setHistory(historyJson.data);
@@ -69,20 +70,17 @@ function App() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 600000); // 10 minutes
+    const interval = setInterval(fetchData, 600000);
     return () => clearInterval(interval);
   }, []);
 
-  // Prepare chart data
-  const chartDataMap = new Map<string, any>();
+  const chartDataMap = new Map<string, Record<string, string | number | null>>();
   const cutoffTime = Date.now() - timeRange * 60 * 60 * 1000;
 
   [...history].reverse().forEach(log => {
-    // SQLite CURRENT_TIMESTAMP is in UTC 'YYYY-MM-DD HH:MM:SS'. Append 'Z' to parse as UTC.
     const logDate = new Date(log.createdAt + 'Z');
     if (logDate.getTime() < cutoffTime) return;
 
-    // 丸め処理: 10分単位でグループ化することで、WebとAPIのログが別々の時間として扱われるのを防ぐ
     const coeff = 1000 * 60 * 10;
     const roundedDate = new Date(Math.round(logDate.getTime() / coeff) * coeff);
     const time = roundedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -90,22 +88,11 @@ function App() {
     if (!chartDataMap.has(time)) {
       chartDataMap.set(time, { time });
     }
-    const entry = chartDataMap.get(time);
-    if (log.target === 'e-Stat Web') {
-      entry.web = log.responseTimeMs ?? null;
-    } else if (log.target === 'e-Stat API') {
-      entry.api = log.responseTimeMs ?? null;
-    }
+    chartDataMap.get(time)![log.target] = log.responseTimeMs ?? null;
   });
 
   const chartData = Array.from(chartDataMap.values());
-
-  const resultMap = Object.fromEntries(
-    results.map(r => [r.target, r])
-  );
-
-  const webResult = resultMap["e-Stat Web"];
-  const apiResult = resultMap["e-Stat API"];
+  const chartTargets = Array.from(new Set(history.map(log => log.target)));
 
   return (
     <div className="container">
@@ -136,60 +123,44 @@ function App() {
         ) : (
           <>
             <div className="card-grid">
-              {[webResult, apiResult].filter(Boolean).map((result) => (
-                <div key={result.target} className={`status-card ${result.status}`}>
-                  <div className="card-header">
-                    <h2>{result.target}</h2>
-
-                    <div className={`status-badge ${result.status}`}>
-                      {result.status === 'up'
-                        ? <CheckCircle2 size={16} />
-                        : <XCircle size={16} />
-                      }
-
-                      <span>{result.status.toUpperCase()}</span>
+              {results.map((result) => {
+                const checkedAt = result.createdAt ?? result.lastChecked;
+                return (
+                  <div key={result.target} className={`status-card ${result.status}`}>
+                    <div className="card-header">
+                      <h2>{result.target}</h2>
+                      <div className={`status-badge ${result.status}`}>
+                        {result.status === 'up' ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
+                        <span>{result.status.toUpperCase()}</span>
+                      </div>
                     </div>
+
+                    <div className="card-body">
+                      <div className="info-row">
+                        <span className="label">Status Code</span>
+                        <span className="value">{result.statusCode ?? 'N/A'}</span>
+                      </div>
+                      <div className="info-row">
+                        <span className="label">Response Time</span>
+                        <span className="value">{result.responseTimeMs != null ? `${result.responseTimeMs}ms` : 'N/A'}</span>
+                      </div>
+                      <div className="info-row">
+                        <span className="label">Last Checked</span>
+                        <span className="value">
+                          {checkedAt ? new Date(checkedAt.replace(' ', 'T') + (checkedAt.endsWith('Z') ? '' : 'Z')).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo' }) : 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {result.error && result.error !== 'Not checked yet' && (
+                      <div className="error-message">
+                        <AlertCircle size={14} />
+                        <span>{result.error}</span>
+                      </div>
+                    )}
                   </div>
-
-                  <div className="card-body">
-                    <div className="info-row">
-                      <span className="label">Status Code</span>
-                      <span className="value">
-                        {result.statusCode || 'N/A'}
-                      </span>
-                    </div>
-
-                    <div className="info-row">
-                      <span className="label">Response Time</span>
-                      <span className="value">
-                        {result.responseTimeMs
-                          ? `${result.responseTimeMs}ms`
-                          : 'N/A'}
-                      </span>
-                    </div>
-
-                    <div className="info-row">
-                      <span className="label">Last Checked</span>
-                      <span className="value">
-                        {
-                          new Date(
-                            result.createdAt.replace(" ", "T") + "Z"
-                          ).toLocaleTimeString("ja-JP", {
-                            timeZone: "Asia/Tokyo",
-                          })
-                        }
-                      </span>
-                    </div>
-                  </div>
-
-                  {result.error && result.error !== 'Not checked yet' && (
-                    <div className="error-message">
-                      <AlertCircle size={14} />
-                      <span>{result.error}</span>
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
             {chartData.length > 0 && (
               <div className="chart-container">
@@ -218,14 +189,15 @@ function App() {
                         itemStyle={{ color: '#f8fafc' }}
                       />
                       <Legend />
-                      <Line type="monotone" dataKey="web" name="Web (ms)" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} connectNulls={true} />
-                      <Line type="monotone" dataKey="api" name="API (ms)" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} connectNulls={true} />
+                      {chartTargets.map((target, index) => (
+                        <Line key={target} type="monotone" dataKey={target} name={target} stroke={CHART_COLORS[index % CHART_COLORS.length]} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} connectNulls />
+                      ))}
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               </div>
             )}
-          </> 
+          </>
         )}
         <span>このサービスは、政府統計総合窓口(e-Stat)のAPI機能を使用していますが、サービスの内容は国によって保証されたものではありません。</span>
       </main>
