@@ -43,25 +43,25 @@ app.post('/api/check-now', async (c) => {
 });
 
 app.get('/api/history', async (c) => {
-  const startDate = c.req.query('startDate');
-  const endDate = c.req.query('endDate');
+  const startDateTime = c.req.query('startDateTime');
+  const endDateTime = c.req.query('endDateTime');
 
-  if ((startDate || endDate) && (!startDate || !endDate || !DATE_PATTERN.test(startDate) || !DATE_PATTERN.test(endDate) || startDate > endDate)) {
+  if ((startDateTime || endDateTime) && (!startDateTime || !endDateTime || !DATE_TIME_PATTERN.test(startDateTime) || !DATE_TIME_PATTERN.test(endDateTime) || startDateTime > endDateTime)) {
     return c.json({
       success: false,
-      error: 'startDate and endDate must be YYYY-MM-DD values, with startDate on or before endDate.'
+      error: 'startDateTime and endDateTime must be YYYY-MM-DDTHH:mm values, with startDateTime on or before endDateTime.'
     }, 400);
   }
 
-  const query = startDate && endDate
+  const query = startDateTime && endDateTime
     ? c.env.DB.prepare(`
         SELECT *
         FROM logs
-        WHERE createdAt >= datetime(? || ' 00:00:00', '-9 hours')
-          AND createdAt < datetime(? || ' 00:00:00', '+15 hours')
+        WHERE createdAt >= datetime(replace(?, 'T', ' '), '-9 hours')
+          AND createdAt < datetime(replace(?, 'T', ' '), '-9 hours', '+1 minute')
         ORDER BY createdAt DESC
         LIMIT 20000
-      `).bind(startDate, endDate)
+      `).bind(startDateTime, endDateTime)
     : c.env.DB.prepare(`
         SELECT * FROM logs ORDER BY createdAt DESC LIMIT 3456
       `);
