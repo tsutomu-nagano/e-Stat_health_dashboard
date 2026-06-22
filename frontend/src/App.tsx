@@ -24,30 +24,26 @@ interface HistoryLog {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#a855f7', '#ec4899', '#06b6d4'];
-const currentDateTimeInJapan = () => {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23'
-  }).formatToParts(new Date());
-  const value = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
-  return `${value('year')}-${value('month')}-${value('day')}T${value('hour')}:${value('minute')}`;
-};
+const todayInJapan = () => new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Tokyo',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+}).format(new Date());
 
 function App() {
-  const now = currentDateTimeInJapan();
+  const today = todayInJapan();
   const [results, setResults] = useState<CheckResult[]>([]);
   const [history, setHistory] = useState<HistoryLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [startDateTime, setStartDateTime] = useState(`${now.slice(0, 10)}T00:00`);
-  const [endDateTime, setEndDateTime] = useState(now);
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
 
-  const historyUrl = () => `${API_BASE_URL}/api/history`;
+  const historyUrl = () => {
+    const params = new URLSearchParams({ startDate, endDate });
+    return `${API_BASE_URL}/api/history?${params.toString()}`;
+  };
 
   const fetchData = async () => {
     try {
@@ -89,18 +85,12 @@ function App() {
     fetchData();
     const interval = setInterval(fetchData, 600000);
     return () => clearInterval(interval);
-  }, [startDateTime, endDateTime]);
+  }, [startDate, endDate]);
 
   const chartDataMap = new Map<string, Record<string, string | number | null>>();
-  const rangeStart = new Date(`${startDateTime}:00+09:00`).getTime();
-  const rangeEnd = new Date(`${endDateTime}:00+09:00`).getTime() + 60_000;
-  const filteredHistory = history.filter((log) => {
-    const timestamp = new Date(log.createdAt + 'Z').getTime();
-    return timestamp >= rangeStart && timestamp < rangeEnd;
-  });
-  const isMultiDay = startDateTime.slice(0, 10) !== endDateTime.slice(0, 10);
+  const isMultiDay = startDate !== endDate;
 
-  [...filteredHistory].reverse().forEach(log => {
+  [...history].reverse().forEach(log => {
     const logDate = new Date(log.createdAt + 'Z');
     const coeff = 1000 * 60 * 10;
     const roundedDate = new Date(Math.round(logDate.getTime() / coeff) * coeff);
@@ -115,16 +105,16 @@ function App() {
   });
 
   const chartData = Array.from(chartDataMap.values());
-  const chartTargets = Array.from(new Set(filteredHistory.map(log => log.target)));
+  const chartTargets = Array.from(new Set(history.map(log => log.target)));
 
-  const updateStartDateTime = (value: string) => {
-    setStartDateTime(value);
-    if (value > endDateTime) setEndDateTime(value);
+  const updateStartDate = (value: string) => {
+    setStartDate(value);
+    if (value > endDate) setEndDate(value);
   };
 
-  const updateEndDateTime = (value: string) => {
-    setEndDateTime(value);
-    if (value < startDateTime) setStartDateTime(value);
+  const updateEndDate = (value: string) => {
+    setEndDate(value);
+    if (value < startDate) setStartDate(value);
   };
 
   return (
@@ -201,13 +191,13 @@ function App() {
                 <h2>Response Time History</h2>
                 <div className="date-range-selector">
                   <label>
-                    開始日時
-                    <input type="datetime-local" value={startDateTime} max={endDateTime} onChange={(event) => updateStartDateTime(event.target.value)} />
+                    開始日
+                    <input type="date" value={startDate} max={endDate} onChange={(event) => updateStartDate(event.target.value)} />
                   </label>
                   <span>〜</span>
                   <label>
-                    終了日時
-                    <input type="datetime-local" value={endDateTime} min={startDateTime} max={now} onChange={(event) => updateEndDateTime(event.target.value)} />
+                    終了日
+                    <input type="date" value={endDate} min={startDate} max={today} onChange={(event) => updateEndDate(event.target.value)} />
                   </label>
                 </div>
               </div>
