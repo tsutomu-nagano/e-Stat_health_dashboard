@@ -8,7 +8,7 @@ type Bindings = {
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 app.use('/api/*', cors({
   origin: '*',
