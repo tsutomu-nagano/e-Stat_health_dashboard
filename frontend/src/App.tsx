@@ -47,10 +47,7 @@ function App() {
   const [startDateTime, setStartDateTime] = useState(`${now.slice(0, 10)}T00:00`);
   const [endDateTime, setEndDateTime] = useState(now);
 
-  const historyUrl = () => {
-    const params = new URLSearchParams({ startDateTime, endDateTime });
-    return `${API_BASE_URL}/api/history?${params.toString()}`;
-  };
+  const historyUrl = () => `${API_BASE_URL}/api/history`;
 
   const fetchData = async () => {
     try {
@@ -95,9 +92,15 @@ function App() {
   }, [startDateTime, endDateTime]);
 
   const chartDataMap = new Map<string, Record<string, string | number | null>>();
+  const rangeStart = new Date(`${startDateTime}:00+09:00`).getTime();
+  const rangeEnd = new Date(`${endDateTime}:00+09:00`).getTime() + 60_000;
+  const filteredHistory = history.filter((log) => {
+    const timestamp = new Date(log.createdAt + 'Z').getTime();
+    return timestamp >= rangeStart && timestamp < rangeEnd;
+  });
   const isMultiDay = startDateTime.slice(0, 10) !== endDateTime.slice(0, 10);
 
-  [...history].reverse().forEach(log => {
+  [...filteredHistory].reverse().forEach(log => {
     const logDate = new Date(log.createdAt + 'Z');
     const coeff = 1000 * 60 * 10;
     const roundedDate = new Date(Math.round(logDate.getTime() / coeff) * coeff);
@@ -112,7 +115,7 @@ function App() {
   });
 
   const chartData = Array.from(chartDataMap.values());
-  const chartTargets = Array.from(new Set(history.map(log => log.target)));
+  const chartTargets = Array.from(new Set(filteredHistory.map(log => log.target)));
 
   const updateStartDateTime = (value: string) => {
     setStartDateTime(value);
