@@ -1,1 +1,2 @@
 ESTAT_APP_ID=YOUR_APP_ID_HERE
+# 監視対象は src/check-targets.json で編集します。
