@@ -54,14 +54,23 @@ app.get('/api/history', async (c) => {
   }
 
   const query = startDateTime && endDateTime
-    ? c.env.DB.prepare(`
-        SELECT *
-        FROM logs
-        WHERE createdAt >= datetime(replace(?, 'T', ' '), '-9 hours')
-          AND createdAt < datetime(replace(?, 'T', ' '), '-9 hours', '+1 minute')
-        ORDER BY createdAt DESC
-        LIMIT 20000
-      `).bind(startDateTime, endDateTime)
+    ? (() => {
+        const startTimestamp = toUtcSqlTimestamp(startDateTime);
+        const endExclusiveTimestamp = toUtcSqlTimestamp(
+          new Date(new Date(`${endDateTime}:00+09:00`).getTime() + 60_000)
+            .toLocaleString('sv-SE', { timeZone: 'Asia/Tokyo' })
+            .replace(' ', 'T')
+            .slice(0, 16)
+        );
+
+        return c.env.DB.prepare(`
+          SELECT *
+          FROM logs
+          WHERE createdAt >= ? AND createdAt < ?
+          ORDER BY createdAt DESC
+          LIMIT 20000
+        `).bind(startTimestamp, endExclusiveTimestamp);
+      })()
     : c.env.DB.prepare(`
         SELECT * FROM logs ORDER BY createdAt DESC LIMIT 3456
       `);
