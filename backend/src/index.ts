@@ -72,7 +72,7 @@ app.get('/api/history', async (c) => {
         `).bind(startTimestamp, endExclusiveTimestamp);
       })()
     : c.env.DB.prepare(`
-        SELECT * FROM logs ORDER BY createdAt DESC LIMIT 3456
+        SELECT * FROM logs ORDER BY createdAt DESC LIMIT 20000
       `);
 
   const { results } = await query.all();
