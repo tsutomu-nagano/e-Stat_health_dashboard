@@ -24,6 +24,20 @@ interface HistoryLog {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#a855f7', '#ec4899', '#06b6d4'];
+
+function StatusDot({ cx, cy, payload, target, color }: any) {
+  const statusCode = payload?.[`${target}StatusCode`];
+  if (statusCode !== undefined && statusCode !== 200) {
+    return (
+      <g>
+        <circle cx={cx} cy={cy} r={7} fill="#ef4444" stroke="#fee2e2" strokeWidth={1} />
+        <path d={`M ${cx - 3} ${cy - 3} L ${cx + 3} ${cy + 3} M ${cx + 3} ${cy - 3} L ${cx - 3} ${cy + 3}`} stroke="#ffffff" strokeWidth={1.8} strokeLinecap="round" />
+      </g>
+    );
+  }
+
+  return <circle cx={cx} cy={cy} r={4} fill={color} stroke="#ffffff" strokeWidth={1} />;
+}
 const todayInJapan = () => new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Asia/Tokyo',
   year: 'numeric',
@@ -113,7 +127,9 @@ function App() {
     if (!chartDataMap.has(time)) {
       chartDataMap.set(time, { time });
     }
-    chartDataMap.get(time)![log.target] = log.responseTimeMs ?? null;
+    const entry = chartDataMap.get(time)!;
+    entry[log.target] = log.responseTimeMs ?? null;
+    entry[`${log.target}StatusCode`] = log.statusCode;
   });
 
   const chartData = Array.from(chartDataMap.values());
@@ -230,7 +246,17 @@ function App() {
                       />
                       <Legend />
                       {chartTargets.map((target, index) => (
-                        <Line key={target} type="monotone" dataKey={target} name={target} stroke={CHART_COLORS[index % CHART_COLORS.length]} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} connectNulls />
+                        <Line
+                          key={target}
+                          type="monotone"
+                          dataKey={target}
+                          name={target}
+                          stroke={CHART_COLORS[index % CHART_COLORS.length]}
+                          strokeWidth={3}
+                          dot={(props) => <StatusDot {...props} target={target} color={CHART_COLORS[index % CHART_COLORS.length]} />}
+                          activeDot={{ r: 6 }}
+                          connectNulls
+                        />
                       ))}
                     </LineChart>
                   </ResponsiveContainer>
