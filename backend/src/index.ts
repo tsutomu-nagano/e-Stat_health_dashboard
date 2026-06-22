@@ -8,7 +8,7 @@ type Bindings = {
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
-const DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 app.use('/api/*', cors({
   origin: '*',
@@ -43,36 +43,27 @@ app.post('/api/check-now', async (c) => {
 });
 
 app.get('/api/history', async (c) => {
-  const startDateTime = c.req.query('startDateTime');
-  const endDateTime = c.req.query('endDateTime');
+  const startDate = c.req.query('startDate');
+  const endDate = c.req.query('endDate');
 
-  if ((startDateTime || endDateTime) && (!startDateTime || !endDateTime || !DATE_TIME_PATTERN.test(startDateTime) || !DATE_TIME_PATTERN.test(endDateTime) || startDateTime > endDateTime)) {
+  if ((startDate || endDate) && (!startDate || !endDate || !DATE_PATTERN.test(startDate) || !DATE_PATTERN.test(endDate) || startDate > endDate)) {
     return c.json({
       success: false,
-      error: 'startDateTime and endDateTime must be YYYY-MM-DDTHH:mm values, with startDateTime on or before endDateTime.'
+      error: 'startDate and endDate must be YYYY-MM-DD values, with startDate on or before endDate.'
     }, 400);
   }
 
-  const query = startDateTime && endDateTime
-    ? (() => {
-        const startTimestamp = toUtcSqlTimestamp(startDateTime);
-        const endExclusiveTimestamp = toUtcSqlTimestamp(
-          new Date(new Date(`${endDateTime}:00+09:00`).getTime() + 60_000)
-            .toLocaleString('sv-SE', { timeZone: 'Asia/Tokyo' })
-            .replace(' ', 'T')
-            .slice(0, 16)
-        );
-
-        return c.env.DB.prepare(`
-          SELECT *
-          FROM logs
-          WHERE createdAt >= ? AND createdAt < ?
-          ORDER BY createdAt DESC
-          LIMIT 20000
-        `).bind(startTimestamp, endExclusiveTimestamp);
-      })()
+  const query = startDate && endDate
+    ? c.env.DB.prepare(`
+        SELECT *
+        FROM logs
+        WHERE createdAt >= datetime(? || ' 00:00:00', '-9 hours')
+          AND createdAt < datetime(? || ' 00:00:00', '+15 hours')
+        ORDER BY createdAt DESC
+        LIMIT 20000
+      `).bind(startDate, endDate)
     : c.env.DB.prepare(`
-        SELECT * FROM logs ORDER BY createdAt DESC LIMIT 20000
+        SELECT * FROM logs ORDER BY createdAt DESC LIMIT 3456
       `);
 
   const { results } = await query.all();
