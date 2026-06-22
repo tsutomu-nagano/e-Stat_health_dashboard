@@ -44,7 +44,7 @@ function App() {
   const [history, setHistory] = useState<HistoryLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [startDateTime, setStartDateTime] = useState(now);
+  const [startDateTime, setStartDateTime] = useState(`${now.slice(0, 10)}T00:00`);
   const [endDateTime, setEndDateTime] = useState(now);
 
   const historyUrl = () => {
