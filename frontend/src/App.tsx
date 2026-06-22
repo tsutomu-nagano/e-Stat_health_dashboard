@@ -37,11 +37,12 @@ function App() {
   const [history, setHistory] = useState<HistoryLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [startDate, setStartDate] = useState(today);
-  const [endDate, setEndDate] = useState(today);
+  const [selectedDate, setSelectedDate] = useState(today);
+  const [startTime, setStartTime] = useState('00:00');
+  const [endTime, setEndTime] = useState('23:59');
 
   const historyUrl = () => {
-    const params = new URLSearchParams({ startDate, endDate });
+    const params = new URLSearchParams({ startDate: selectedDate, endDate: selectedDate });
     return `${API_BASE_URL}/api/history?${params.toString()}`;
   };
 
@@ -85,18 +86,29 @@ function App() {
     fetchData();
     const interval = setInterval(fetchData, 600000);
     return () => clearInterval(interval);
-  }, [startDate, endDate]);
+  }, [selectedDate]);
 
   const chartDataMap = new Map<string, Record<string, string | number | null>>();
-  const isMultiDay = startDate !== endDate;
+  const timeInJapan = (date: Date) => {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Tokyo',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23'
+    }).formatToParts(date);
+    const value = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
+    return `${value('hour')}:${value('minute')}`;
+  };
+  const filteredHistory = history.filter((log) => {
+    const time = timeInJapan(new Date(log.createdAt + 'Z'));
+    return time >= startTime && time <= endTime;
+  });
 
-  [...history].reverse().forEach(log => {
+  [...filteredHistory].reverse().forEach(log => {
     const logDate = new Date(log.createdAt + 'Z');
     const coeff = 1000 * 60 * 10;
     const roundedDate = new Date(Math.round(logDate.getTime() / coeff) * coeff);
-    const time = isMultiDay
-      ? roundedDate.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-      : roundedDate.toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' });
+    const time = roundedDate.toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' });
 
     if (!chartDataMap.has(time)) {
       chartDataMap.set(time, { time });
@@ -105,16 +117,16 @@ function App() {
   });
 
   const chartData = Array.from(chartDataMap.values());
-  const chartTargets = Array.from(new Set(history.map(log => log.target)));
+  const chartTargets = Array.from(new Set(filteredHistory.map(log => log.target)));
 
-  const updateStartDate = (value: string) => {
-    setStartDate(value);
-    if (value > endDate) setEndDate(value);
+  const updateStartTime = (value: string) => {
+    setStartTime(value);
+    if (value > endTime) setEndTime(value);
   };
 
-  const updateEndDate = (value: string) => {
-    setEndDate(value);
-    if (value < startDate) setStartDate(value);
+  const updateEndTime = (value: string) => {
+    setEndTime(value);
+    if (value < startTime) setStartTime(value);
   };
 
   return (
@@ -191,13 +203,17 @@ function App() {
                 <h2>Response Time History</h2>
                 <div className="date-range-selector">
                   <label>
-                    開始日
-                    <input type="date" value={startDate} max={endDate} onChange={(event) => updateStartDate(event.target.value)} />
+                    日付
+                    <input type="date" value={selectedDate} max={today} onChange={(event) => setSelectedDate(event.target.value)} />
+                  </label>
+                  <label>
+                    開始時刻
+                    <input type="time" value={startTime} max={endTime} step="60" onChange={(event) => updateStartTime(event.target.value)} />
                   </label>
                   <span>〜</span>
                   <label>
-                    終了日
-                    <input type="date" value={endDate} min={startDate} max={today} onChange={(event) => updateEndDate(event.target.value)} />
+                    終了時刻
+                    <input type="time" value={endTime} min={startTime} step="60" onChange={(event) => updateEndTime(event.target.value)} />
                   </label>
                 </div>
               </div>
