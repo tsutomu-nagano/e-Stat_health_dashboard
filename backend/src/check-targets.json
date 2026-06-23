@@ -5,28 +5,45 @@
       "name": "e-Stat Web",
       "type": "http",
       "url": "https://www.e-stat.go.jp/",
-      "acceptableStatusCodes": [200]
+      "acceptableStatusCodes": [
+        200
+      ]
     },
     {
       "id": "estat-api",
       "name": "e-Stat API",
       "type": "estat-api",
       "url": "https://api.e-stat.go.jp/rest/3.0/app/json/getStatsList?appId={ESTAT_APP_ID}&statsNameList=Y",
-      "acceptableStatusCodes": [200]
+      "acceptableStatusCodes": [
+        200
+      ]
     },
     {
       "id": "miripo",
       "name": "miripo",
       "type": "http",
       "url": "https://www.e-stat.go.jp/microdata/",
-      "acceptableStatusCodes": [200]
+      "acceptableStatusCodes": [
+        200
+      ]
     },
     {
       "id": "e-micro-login",
       "name": "e-Micro Login",
       "type": "http",
       "url": "https://www.e-stat.go.jp/microdata/mypage/login",
-      "acceptableStatusCodes": [200]
+      "acceptableStatusCodes": [
+        200
+      ]
+    },
+    {
+      "id": "jstatmap",
+      "name": "jSTAT MAP",
+      "type": "http",
+      "url": "https://www.e-stat.go.jp/gis",
+      "acceptableStatusCodes": [
+        200
+      ]
     }
   ]
 }
