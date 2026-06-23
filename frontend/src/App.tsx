@@ -23,15 +23,15 @@ interface HistoryLog {
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#a855f7', '#ec4899', '#06b6d4'];
-
-const colorForTarget = (target: string) => {
-  let hash = 0;
-  for (let index = 0; index < target.length; index += 1) {
-    hash = (hash * 31 + target.charCodeAt(index)) | 0;
-  }
-  return CHART_COLORS[Math.abs(hash) % CHART_COLORS.length];
+const TARGET_COLORS: Record<string, string> = {
+  'e-Stat Web': '#3b82f6',
+  'e-Stat API': '#10b981',
+  miripo: '#f59e0b',
+  'e-Micro Login': '#a855f7',
+  'jSTAT MAP': '#ec4899'
 };
+
+const colorForTarget = (target: string) => TARGET_COLORS[target] ?? '#06b6d4';
 
 function StatusDot({ cx, cy, payload, target, color }: any) {
   const statusCode = payload?.[`${target}StatusCode`];
