@@ -25,6 +25,14 @@ interface HistoryLog {
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#a855f7', '#ec4899', '#06b6d4'];
 
+const colorForTarget = (target: string) => {
+  let hash = 0;
+  for (let index = 0; index < target.length; index += 1) {
+    hash = (hash * 31 + target.charCodeAt(index)) | 0;
+  }
+  return CHART_COLORS[Math.abs(hash) % CHART_COLORS.length];
+};
+
 function StatusDot({ cx, cy, payload, target, color }: any) {
   const statusCode = payload?.[`${target}StatusCode`];
   if (statusCode !== undefined && statusCode !== 200) {
@@ -251,9 +259,9 @@ function App() {
                           type="monotone"
                           dataKey={target}
                           name={target}
-                          stroke={CHART_COLORS[index % CHART_COLORS.length]}
+                          stroke={colorForTarget(target)}
                           strokeWidth={3}
-                          dot={(props) => <StatusDot {...props} target={target} color={CHART_COLORS[index % CHART_COLORS.length]} />}
+                          dot={(props) => <StatusDot {...props} target={target} color={colorForTarget(target)} />}
                           activeDot={{ r: 6 }}
                           connectNulls
                         />
