@@ -101,11 +101,18 @@ h1 {
 .status-badge.up { color: var(--success); background: var(--success-bg); border: 1px solid rgba(16, 185, 129, 0.2); }
 .status-badge.down { color: var(--error); background: var(--error-bg); border: 1px solid rgba(239, 68, 68, 0.2); }
 
-.details-btn {
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.details-btn,
+.chart-toggle {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  margin-left: auto;
   padding: 0.25rem 0;
   border: 0;
   color: var(--text-muted);
@@ -122,11 +129,20 @@ h1 {
   color: var(--accent-color);
 }
 
-.details-btn svg {
+.chart-toggle.active {
+  color: var(--success);
+}
+
+.chart-toggle:hover {
+  color: var(--text-main);
+}
+
+.details-btn svg,
+.chart-toggle svg {
   transition: transform 0.2s ease;
 }
 
-.status-card.expanded .details-btn {
+.status-card.expanded .card-actions {
   margin-bottom: 1.25rem;
 }
 
