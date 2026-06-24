@@ -62,6 +62,7 @@ function App() {
   const [selectedDate, setSelectedDate] = useState(today);
   const [startTime, setStartTime] = useState('00:00');
   const [endTime, setEndTime] = useState('23:59');
+  const [expandedTargets, setExpandedTargets] = useState<Set<string>>(new Set());
 
   const historyUrl = () => {
     const params = new URLSearchParams({ startDate: selectedDate, endDate: selectedDate });
@@ -143,6 +144,18 @@ function App() {
   const chartData = Array.from(chartDataMap.values());
   const chartTargets = Array.from(new Set(filteredHistory.map(log => log.target)));
 
+  const toggleTargetDetails = (target: string) => {
+    setExpandedTargets((current) => {
+      const next = new Set(current);
+      if (next.has(target)) {
+        next.delete(target);
+      } else {
+        next.add(target);
+      }
+      return next;
+    });
+  };
+
   const updateStartTime = (value: string) => {
     setStartTime(value);
     if (value > endTime) setEndTime(value);
@@ -184,8 +197,9 @@ function App() {
             <div className="card-grid">
               {results.map((result) => {
                 const checkedAt = result.createdAt ?? result.lastChecked;
+                const isDetailsOpen = expandedTargets.has(result.target);
                 return (
-                  <div key={result.target} className={`status-card ${result.status}`}>
+                  <div key={result.target} className={`status-card ${result.status} ${isDetailsOpen ? 'expanded' : 'compact'}`}>
                     <div className="card-header">
                       <h2>{result.target}</h2>
                       <div className={`status-badge ${result.status}`}>
@@ -194,28 +208,41 @@ function App() {
                       </div>
                     </div>
 
-                    <div className="card-body">
-                      <div className="info-row">
-                        <span className="label">Status Code</span>
-                        <span className="value">{result.statusCode ?? 'N/A'}</span>
-                      </div>
-                      <div className="info-row">
-                        <span className="label">Response Time</span>
-                        <span className="value">{result.responseTimeMs != null ? `${result.responseTimeMs}ms` : 'N/A'}</span>
-                      </div>
-                      <div className="info-row">
-                        <span className="label">Last Checked</span>
-                        <span className="value">
-                          {checkedAt ? new Date(checkedAt.replace(' ', 'T') + (checkedAt.endsWith('Z') ? '' : 'Z')).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo' }) : 'N/A'}
-                        </span>
-                      </div>
-                    </div>
+                    <button
+                      type="button"
+                      className="details-btn"
+                      aria-expanded={isDetailsOpen}
+                      onClick={() => toggleTargetDetails(result.target)}
+                    >
+                      {isDetailsOpen ? '詳細を閉じる' : '詳細を表示'}
+                    </button>
 
-                    {result.error && result.error !== 'Not checked yet' && (
-                      <div className="error-message">
-                        <AlertCircle size={14} />
-                        <span>{result.error}</span>
-                      </div>
+                    {isDetailsOpen && (
+                      <>
+                        <div className="card-body">
+                          <div className="info-row">
+                            <span className="label">Status Code</span>
+                            <span className="value">{result.statusCode ?? 'N/A'}</span>
+                          </div>
+                          <div className="info-row">
+                            <span className="label">Response Time</span>
+                            <span className="value">{result.responseTimeMs != null ? `${result.responseTimeMs}ms` : 'N/A'}</span>
+                          </div>
+                          <div className="info-row">
+                            <span className="label">Last Checked</span>
+                            <span className="value">
+                              {checkedAt ? new Date(checkedAt.replace(' ', 'T') + (checkedAt.endsWith('Z') ? '' : 'Z')).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo' }) : 'N/A'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {result.error && result.error !== 'Not checked yet' && (
+                          <div className="error-message">
+                            <AlertCircle size={14} />
+                            <span>{result.error}</span>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 );
@@ -243,7 +270,7 @@ function App() {
               </div>
               {chartData.length > 0 ? (
                 <div className="chart-wrapper">
-                  <ResponsiveContainer width="100%" height={300}>
+                  <ResponsiveContainer width="100%" height={440}>
                     <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                       <XAxis dataKey="time" stroke="#94a3b8" tick={{ fill: '#94a3b8' }} />
