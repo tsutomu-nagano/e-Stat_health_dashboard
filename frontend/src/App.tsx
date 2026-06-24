@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, RefreshCcw, CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Activity, RefreshCcw, CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface CheckResult {
@@ -63,6 +63,7 @@ function App() {
   const [startTime, setStartTime] = useState('00:00');
   const [endTime, setEndTime] = useState('23:59');
   const [expandedTargets, setExpandedTargets] = useState<Set<string>>(new Set());
+  const [hiddenChartTargets, setHiddenChartTargets] = useState<Set<string>>(new Set());
 
   const historyUrl = () => {
     const params = new URLSearchParams({ startDate: selectedDate, endDate: selectedDate });
@@ -142,10 +143,24 @@ function App() {
   });
 
   const chartData = Array.from(chartDataMap.values());
-  const chartTargets = Array.from(new Set(filteredHistory.map(log => log.target)));
+  const chartTargets = Array.from(
+    new Set(filteredHistory.filter((log) => !hiddenChartTargets.has(log.target)).map((log) => log.target))
+  );
 
   const toggleTargetDetails = (target: string) => {
     setExpandedTargets((current) => {
+      const next = new Set(current);
+      if (next.has(target)) {
+        next.delete(target);
+      } else {
+        next.add(target);
+      }
+      return next;
+    });
+  };
+
+  const toggleChartTarget = (target: string) => {
+    setHiddenChartTargets((current) => {
       const next = new Set(current);
       if (next.has(target)) {
         next.delete(target);
@@ -198,6 +213,7 @@ function App() {
               {results.map((result) => {
                 const checkedAt = result.createdAt ?? result.lastChecked;
                 const isDetailsOpen = expandedTargets.has(result.target);
+                const isChartVisible = !hiddenChartTargets.has(result.target);
                 return (
                   <div key={result.target} className={`status-card ${result.status} ${isDetailsOpen ? 'expanded' : 'compact'}`}>
                     <div className="card-header">
@@ -208,15 +224,26 @@ function App() {
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      className={`details-btn ${isDetailsOpen ? 'open' : ''}`}
-                      aria-expanded={isDetailsOpen}
-                      onClick={() => toggleTargetDetails(result.target)}
-                    >
-                      <span>{isDetailsOpen ? '詳細を閉じる' : '詳細を表示'}</span>
-                      {isDetailsOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    </button>
+                    <div className="card-actions">
+                      <button
+                        type="button"
+                        className={`chart-toggle ${isChartVisible ? 'active' : ''}`}
+                        aria-pressed={isChartVisible}
+                        onClick={() => toggleChartTarget(result.target)}
+                      >
+                        {isChartVisible ? <Eye size={15} /> : <EyeOff size={15} />}
+                        <span>{isChartVisible ? 'グラフ表示中' : 'グラフ非表示'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`details-btn ${isDetailsOpen ? 'open' : ''}`}
+                        aria-expanded={isDetailsOpen}
+                        onClick={() => toggleTargetDetails(result.target)}
+                      >
+                        <span>{isDetailsOpen ? '詳細を閉じる' : '詳細を表示'}</span>
+                        {isDetailsOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </button>
+                    </div>
 
                     {isDetailsOpen && (
                       <>
