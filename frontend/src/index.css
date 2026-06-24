@@ -74,7 +74,7 @@ h1 {
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 .dashboard { display: flex; flex-direction: column; gap: 2rem; }
-.card-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.5rem; }
+.card-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1.5rem; }
 
 .status-card {
   background: var(--card-bg);
