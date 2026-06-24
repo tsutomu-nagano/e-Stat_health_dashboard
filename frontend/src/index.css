@@ -93,12 +93,35 @@ h1 {
 .status-card.up::before { background: var(--success); }
 .status-card.down::before { background: var(--error); }
 
-.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.status-card.compact .card-header { margin-bottom: 1.25rem; }
 .card-header h2 { font-size: 1.25rem; font-weight: 500; }
 
 .status-badge { display: flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.875rem; border-radius: 99px; font-size: 0.875rem; font-weight: 600; letter-spacing: 0.05em; }
 .status-badge.up { color: var(--success); background: var(--success-bg); border: 1px solid rgba(16, 185, 129, 0.2); }
 .status-badge.down { color: var(--error); background: var(--error-bg); border: 1px solid rgba(239, 68, 68, 0.2); }
+
+.details-btn {
+  width: 100%;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.details-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.status-card.expanded .details-btn {
+  margin-bottom: 1.25rem;
+}
 
 .card-body { display: flex; flex-direction: column; gap: 1rem; }
 .info-row { display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.75rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
@@ -122,7 +145,7 @@ h1 {
 .date-range-selector input { color-scheme: dark; border: 1px solid var(--card-border); border-radius: 6px; background: rgba(255, 255, 255, 0.05); color: var(--text-main); padding: 0.35rem 0.5rem; font-family: inherit; }
 .date-range-selector > span { color: var(--text-muted); }
 
-.chart-wrapper { width: 100%; height: 300px; }
+.chart-wrapper { width: 100%; height: 440px; }
 
 @media (max-width: 1200px) {
   .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -135,4 +158,5 @@ h1 {
   .chart-header { flex-direction: column; }
   .date-range-selector { width: 100%; flex-wrap: wrap; }
   .card-grid { grid-template-columns: 1fr; }
+  .chart-wrapper { height: 360px; }
 }
