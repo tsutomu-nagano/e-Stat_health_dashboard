@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, RefreshCcw, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Activity, RefreshCcw, CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface CheckResult {
@@ -210,11 +210,12 @@ function App() {
 
                     <button
                       type="button"
-                      className="details-btn"
+                      className={`details-btn ${isDetailsOpen ? 'open' : ''}`}
                       aria-expanded={isDetailsOpen}
                       onClick={() => toggleTargetDetails(result.target)}
                     >
-                      {isDetailsOpen ? '詳細を閉じる' : '詳細を表示'}
+                      <span>{isDetailsOpen ? '詳細を閉じる' : '詳細を表示'}</span>
+                      {isDetailsOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </button>
 
                     {isDetailsOpen && (
@@ -270,7 +271,7 @@ function App() {
               </div>
               {chartData.length > 0 ? (
                 <div className="chart-wrapper">
-                  <ResponsiveContainer width="100%" height={440}>
+                  <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                       <XAxis dataKey="time" stroke="#94a3b8" tick={{ fill: '#94a3b8' }} />
@@ -302,7 +303,7 @@ function App() {
             </div>
           </>
         )}
-        <span>このサービスは、政府統計総合窓口(e-Stat)のAPI機能を使用していますが、サービスの内容は国によって保証されたものではありません。</span>
+        <p className="disclaimer">このサービスは、政府統計総合窓口(e-Stat)のAPI機能を使用していますが、サービスの内容は国によって保証されたものではありません。</p>
       </main>
     </div>
   );
