@@ -108,8 +108,7 @@ h1 {
   gap: 0.75rem;
 }
 
-.details-btn,
-.chart-toggle {
+.details-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
@@ -129,12 +128,30 @@ h1 {
   color: var(--accent-color);
 }
 
-.chart-toggle.active {
-  color: var(--success);
+.chart-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--card-border);
+  border-radius: 50%;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.035);
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
 
 .chart-toggle:hover {
   color: var(--text-main);
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+.chart-toggle.active {
+  color: var(--success);
+  border-color: rgba(16, 185, 129, 0.4);
+  background: var(--success-bg);
 }
 
 .details-btn svg,
