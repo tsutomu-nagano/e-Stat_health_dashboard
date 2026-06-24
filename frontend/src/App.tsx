@@ -23,6 +23,21 @@ interface HistoryLog {
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const HIDDEN_CHART_TARGETS_KEY = 'estat-dashboard.hidden-chart-targets';
+
+const loadHiddenChartTargets = (): Set<string> => {
+  if (typeof window === 'undefined') return new Set();
+
+  try {
+    const stored = window.localStorage.getItem(HIDDEN_CHART_TARGETS_KEY);
+    const targets: unknown = stored ? JSON.parse(stored) : [];
+    return Array.isArray(targets)
+      ? new Set(targets.filter((target): target is string => typeof target === 'string'))
+      : new Set();
+  } catch {
+    return new Set();
+  }
+};
 const TARGET_COLORS: Record<string, string> = {
   'e-Stat Web': '#3b82f6',
   'e-Stat API': '#10b981',
@@ -63,7 +78,7 @@ function App() {
   const [startTime, setStartTime] = useState('00:00');
   const [endTime, setEndTime] = useState('23:59');
   const [expandedTargets, setExpandedTargets] = useState<Set<string>>(new Set());
-  const [hiddenChartTargets, setHiddenChartTargets] = useState<Set<string>>(new Set());
+  const [hiddenChartTargets, setHiddenChartTargets] = useState<Set<string>>(loadHiddenChartTargets);
 
   const historyUrl = () => {
     const params = new URLSearchParams({ startDate: selectedDate, endDate: selectedDate });
@@ -111,6 +126,10 @@ function App() {
     const interval = setInterval(fetchData, 600000);
     return () => clearInterval(interval);
   }, [selectedDate]);
+
+  useEffect(() => {
+    window.localStorage.setItem(HIDDEN_CHART_TARGETS_KEY, JSON.stringify([...hiddenChartTargets]));
+  }, [hiddenChartTargets]);
 
   const chartDataMap = new Map<string, Record<string, string | number | null>>();
   const timeInJapan = (date: Date) => {
@@ -238,10 +257,11 @@ function App() {
                       <button
                         type="button"
                         className={`details-btn ${isDetailsOpen ? 'open' : ''}`}
+                        aria-label={isDetailsOpen ? `${result.target}の詳細を閉じる` : `${result.target}の詳細を表示する`}
                         aria-expanded={isDetailsOpen}
+                        title={isDetailsOpen ? '詳細を閉じる' : '詳細を表示'}
                         onClick={() => toggleTargetDetails(result.target)}
                       >
-                        <span>{isDetailsOpen ? '詳細を閉じる' : '詳細を表示'}</span>
                         {isDetailsOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                       </button>
                     </div>
