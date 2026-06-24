@@ -108,26 +108,7 @@ h1 {
   gap: 0.75rem;
 }
 
-.details-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0;
-  border: 0;
-  color: var(--text-muted);
-  background: transparent;
-  font: inherit;
-  font-size: 0.8rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: color 0.2s ease;
-}
-
-.details-btn:hover,
-.details-btn.open {
-  color: var(--accent-color);
-}
-
+.details-btn,
 .chart-toggle {
   display: inline-grid;
   place-items: center;
@@ -142,10 +123,17 @@ h1 {
   transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
 
+.details-btn:hover,
 .chart-toggle:hover {
   color: var(--text-main);
   background: rgba(255, 255, 255, 0.1);
   transform: translateY(-1px);
+}
+
+.details-btn.open {
+  color: var(--accent-color);
+  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(59, 130, 246, 0.15);
 }
 
 .chart-toggle.active {
