@@ -228,11 +228,12 @@ function App() {
                       <button
                         type="button"
                         className={`chart-toggle ${isChartVisible ? 'active' : ''}`}
+                        aria-label={isChartVisible ? `${result.target}をグラフから非表示にする` : `${result.target}をグラフに表示する`}
                         aria-pressed={isChartVisible}
+                        title={isChartVisible ? 'グラフに表示中' : 'グラフから非表示'}
                         onClick={() => toggleChartTarget(result.target)}
                       >
-                        {isChartVisible ? <Eye size={15} /> : <EyeOff size={15} />}
-                        <span>{isChartVisible ? 'グラフ表示中' : 'グラフ非表示'}</span>
+                        {isChartVisible ? <Eye size={16} /> : <EyeOff size={16} />}
                       </button>
                       <button
                         type="button"
