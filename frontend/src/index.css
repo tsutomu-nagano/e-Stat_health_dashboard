@@ -102,21 +102,28 @@ h1 {
 .status-badge.down { color: var(--error); background: var(--error-bg); border: 1px solid rgba(239, 68, 68, 0.2); }
 
 .details-btn {
-  width: 100%;
-  border: 1px solid var(--card-border);
-  border-radius: 10px;
-  padding: 0.55rem 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+  padding: 0.25rem 0;
+  border: 0;
   color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.04);
+  background: transparent;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition: color 0.2s ease;
 }
 
-.details-btn:hover {
-  color: var(--text-main);
-  background: rgba(255, 255, 255, 0.1);
+.details-btn:hover,
+.details-btn.open {
+  color: var(--accent-color);
+}
+
+.details-btn svg {
+  transition: transform 0.2s ease;
 }
 
 .status-card.expanded .details-btn {
@@ -145,7 +152,19 @@ h1 {
 .date-range-selector input { color-scheme: dark; border: 1px solid var(--card-border); border-radius: 6px; background: rgba(255, 255, 255, 0.05); color: var(--text-main); padding: 0.35rem 0.5rem; font-family: inherit; }
 .date-range-selector > span { color: var(--text-muted); }
 
-.chart-wrapper { width: 100%; height: 440px; }
+.chart-wrapper {
+  width: 100%;
+  height: 440px;
+  min-height: 0;
+}
+
+.disclaimer {
+  margin: 0;
+  padding: 0 0 1rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
 
 @media (max-width: 1200px) {
   .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
