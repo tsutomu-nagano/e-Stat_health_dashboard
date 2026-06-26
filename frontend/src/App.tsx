@@ -41,9 +41,10 @@ const loadHiddenChartTargets = (): Set<string> => {
 const TARGET_COLORS: Record<string, string> = {
   'e-Stat Web': '#3b82f6',
   'e-Stat API': '#10b981',
-  miripo: '#f59e0b',
+  'miripo': '#f59e0b',
   'e-Micro Login': '#a855f7',
-  'jSTAT MAP': '#ec4899'
+  'jSTAT MAP': '#ec4899',
+  'e-survey': '#06b6d4'
 };
 
 const colorForTarget = (target: string) => TARGET_COLORS[target] ?? '#06b6d4';
