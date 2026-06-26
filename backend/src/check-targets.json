@@ -44,6 +44,15 @@
       "acceptableStatusCodes": [
         200
       ]
+    },
+    {
+      "id": "e-survey",
+      "name": "e-survay",
+      "type": "http",
+      "url": "https://www.e-survey.go.jp/",
+      "acceptableStatusCodes": [
+        200
+      ]
     }
   ]
 }
