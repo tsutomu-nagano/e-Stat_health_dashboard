@@ -4,6 +4,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    image: estat-health-dash:back
+
     tty: true
     stdin_open: true
     ports:
@@ -19,6 +21,14 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    image: estat-health-dash:front
+
+    volumes:
+      - ./frontend/public:/app/public
+      - ./frontend/src:/app/src
+
+    working_dir: "/app"
+
     ports:
       - "5173:5173"
     environment:
@@ -26,3 +36,4 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+
