@@ -212,7 +212,7 @@ function App() {
       <header className="header">
         <div className="logo">
           <Activity className="logo-icon" />
-          <h1>e-Stat Status Dashboard</h1>
+          <h1>e-Stat Health Dashboard</h1>
         </div>
         <button
           className={`refresh-btn ${refreshing ? 'spinning' : ''}`}
