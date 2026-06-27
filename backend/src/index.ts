@@ -53,19 +53,14 @@ app.get('/api/history', async (c) => {
     }, 400);
   }
 
-  const query = startDate && endDate
-    ? c.env.DB.prepare(`
-        SELECT *
-        FROM logs
-        WHERE createdAt >= datetime(? || ' 00:00:00', '-9 hours')
-          AND createdAt < datetime(? || ' 00:00:00', '+15 hours')
-        ORDER BY createdAt DESC
-        LIMIT 20000
-      `).bind(startDate, endDate)
-    : c.env.DB.prepare(`
-        SELECT * FROM logs ORDER BY createdAt DESC LIMIT 3456
-      `);
-
+const query = c.env.DB.prepare(`
+    SELECT *
+    FROM logs
+    WHERE createdAt >= datetime(? || ' 00:00:00', '-9 hours')
+      AND createdAt < datetime(? || ' 00:00:00', '+1 day', '-9 hours')
+    ORDER BY createdAt DESC
+    LIMIT 20000
+  `).bind(startDate, endDate);
   const { results } = await query.all();
   return c.json({
     success: true,
