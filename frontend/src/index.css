@@ -36,7 +36,7 @@ body {
   100% { transform: translate(-30px, 50px) rotate(360deg); }
 }
 
-.container { max-width: 1600px; margin: 0 auto; padding: 2rem; }
+.container { max-width: 1800px; margin: 0 auto; padding: 2rem; }
 
 .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--card-border); }
 .logo { display: flex; align-items: center; gap: 1rem; }
@@ -74,7 +74,7 @@ h1 {
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 .dashboard { display: flex; flex-direction: column; gap: 2rem; }
-.card-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1.5rem; }
+.card-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1.5rem; }
 
 .status-card {
   background: var(--card-bg);
