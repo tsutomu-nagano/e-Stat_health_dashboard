@@ -1,10 +1,15 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { checkEndpoints } from './checker.js';
+import { handleLineWebhook, verifyLineSignature } from './line-webhook.js';
 
 type Bindings = {
   DB: any;
   ESTAT_APP_ID?: string;
+  LINE_CHANNEL_ACCESS_TOKEN?: string;
+  LINE_CHANNEL_SECRET?: string;
+  DASHBOARD_URL?: string;
+  NOTIFY_FAILURE_THRESHOLD?: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -40,6 +45,23 @@ app.post('/api/check-now', async (c) => {
     success: true,
     data: results
   });
+});
+
+app.post('/api/line-webhook', async (c) => {
+  const bodyText = await c.req.text();
+  const signature = c.req.header('x-line-signature') ?? null;
+  const isValid = await verifyLineSignature(
+    bodyText,
+    signature,
+    c.env.LINE_CHANNEL_SECRET
+  );
+
+  if (!isValid) {
+    return c.json({ success: false, error: 'Invalid LINE signature' }, 401);
+  }
+
+  const count = await handleLineWebhook(c.env, JSON.parse(bodyText));
+  return c.json({ success: true, count });
 });
 
 app.get('/api/history', async (c) => {

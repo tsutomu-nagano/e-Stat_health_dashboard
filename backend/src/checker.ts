@@ -1,4 +1,5 @@
 import targetsConfig from './check-targets.json';
+import { sendLineNotification, type NotificationEnv } from './notifier';
 
 export interface CheckResult {
   target: string;
@@ -20,6 +21,17 @@ type TargetConfig = {
 type Env = {
   DB: any;
   ESTAT_APP_ID?: string;
+  NOTIFY_FAILURE_THRESHOLD?: string;
+} & NotificationEnv;
+
+type NotificationState = {
+  target: string;
+  consecutiveFailures: number;
+  notifiedAt: string | null;
+  recoveredAt: string | null;
+  lastStatusCode: number | null;
+  lastError: string | null;
+  updatedAt: string;
 };
 
 const targets = targetsConfig.targets as TargetConfig[];
@@ -34,6 +46,97 @@ const saveResult = async (env: Env, result: CheckResult) => {
     result.responseTimeMs ?? null,
     result.error ?? null
   ).run();
+};
+
+const failureThreshold = (env: Env): number => {
+  const parsed = Number(env.NOTIFY_FAILURE_THRESHOLD ?? '3');
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 3;
+};
+
+const getNotificationState = async (
+  env: Env,
+  target: string
+): Promise<NotificationState | null> => {
+  const state = await env.DB.prepare(
+    `SELECT * FROM notification_states WHERE target = ?`
+  ).bind(target).first<NotificationState>();
+
+  return state ?? null;
+};
+
+const upsertNotificationState = async (
+  env: Env,
+  result: CheckResult,
+  consecutiveFailures: number,
+  notifiedAt: string | null,
+  recoveredAt: string | null
+) => {
+  await env.DB.prepare(`
+    INSERT INTO notification_states (
+      target,
+      consecutiveFailures,
+      notifiedAt,
+      recoveredAt,
+      lastStatusCode,
+      lastError,
+      updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(target) DO UPDATE SET
+      consecutiveFailures = excluded.consecutiveFailures,
+      notifiedAt = excluded.notifiedAt,
+      recoveredAt = excluded.recoveredAt,
+      lastStatusCode = excluded.lastStatusCode,
+      lastError = excluded.lastError,
+      updatedAt = CURRENT_TIMESTAMP
+  `).bind(
+    result.target,
+    consecutiveFailures,
+    notifiedAt,
+    recoveredAt,
+    result.statusCode ?? null,
+    result.error ?? null
+  ).run();
+};
+
+const handleNotificationState = async (env: Env, result: CheckResult) => {
+  try {
+    const state = await getNotificationState(env, result.target);
+    const now = new Date().toISOString();
+
+    if (result.status === 'up') {
+      if (state?.notifiedAt) {
+        await sendLineNotification(env, 'recovery', result, 0);
+      }
+
+      await upsertNotificationState(env, result, 0, null, now);
+      return;
+    }
+
+    const consecutiveFailures = (state?.consecutiveFailures ?? 0) + 1;
+    let notifiedAt = state?.notifiedAt ?? null;
+
+    if (consecutiveFailures >= failureThreshold(env) && !notifiedAt) {
+      const sent = await sendLineNotification(
+        env,
+        'failure',
+        result,
+        consecutiveFailures
+      );
+      if (sent) {
+        notifiedAt = now;
+      }
+    }
+
+    await upsertNotificationState(
+      env,
+      result,
+      consecutiveFailures,
+      notifiedAt,
+      state?.recoveredAt ?? null
+    );
+  } catch (err) {
+    console.error('Failed to process notification state', err);
+  }
 };
 
 const checkTarget = async (env: Env, target: TargetConfig): Promise<CheckResult> => {
@@ -76,6 +179,7 @@ const checkTarget = async (env: Env, target: TargetConfig): Promise<CheckResult>
       error
     };
     await saveResult(env, result);
+    await handleNotificationState(env, result);
     return result;
   } catch (err: any) {
     const result: CheckResult = {
@@ -85,6 +189,7 @@ const checkTarget = async (env: Env, target: TargetConfig): Promise<CheckResult>
       error: err instanceof Error ? err.message : String(err)
     };
     await saveResult(env, result);
+    await handleNotificationState(env, result);
     return result;
   }
 };

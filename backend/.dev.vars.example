@@ -1,2 +1,10 @@
 ESTAT_APP_ID=YOUR_APP_ID_HERE
+
+# LINE通知を有効にする場合に設定します。
+# 未設定の場合、連続失敗状態は記録されますがLINE通知は送信されません。
+LINE_CHANNEL_ACCESS_TOKEN=
+LINE_CHANNEL_SECRET=
+DASHBOARD_URL=http://localhost:5173
+NOTIFY_FAILURE_THRESHOLD=3
+
 # 監視対象は src/check-targets.json で編集します。

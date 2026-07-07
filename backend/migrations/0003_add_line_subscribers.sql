@@ -1,0 +1,9 @@
+-- Migration number: 0003
+CREATE TABLE IF NOT EXISTS line_subscribers (
+  lineId TEXT PRIMARY KEY,
+  sourceType TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  followedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  unfollowedAt DATETIME,
+  updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+);
