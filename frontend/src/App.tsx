@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, RefreshCcw, CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronUp, Eye, EyeOff, GripVertical } from 'lucide-react';
+import { Activity, RefreshCcw, CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronUp, Eye, EyeOff, ArrowLeft, ArrowRight } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface CheckResult {
@@ -113,7 +113,6 @@ function App() {
   const [userId, setUserId] = useState('anonymous');
   const [cardOrder, setCardOrder] = useState<string[]>([]);
   const [cardOrderUserId, setCardOrderUserId] = useState('anonymous');
-  const [draggingTarget, setDraggingTarget] = useState<string | null>(null);
 
   const historyUrl = () => {
     const params = new URLSearchParams({ startDate: selectedDate, endDate: selectedDate });
@@ -266,13 +265,11 @@ function App() {
     });
   };
 
-  const moveCard = (sourceTarget: string, destinationTarget: string) => {
-    if (sourceTarget === destinationTarget) return;
-
+  const moveCardByOffset = (target: string, offset: -1 | 1) => {
     setCardOrder((current) => {
-      const sourceIndex = current.indexOf(sourceTarget);
-      const destinationIndex = current.indexOf(destinationTarget);
-      if (sourceIndex === -1 || destinationIndex === -1) return current;
+      const sourceIndex = current.indexOf(target);
+      const destinationIndex = sourceIndex + offset;
+      if (sourceIndex === -1 || destinationIndex < 0 || destinationIndex >= current.length) return current;
 
       const next = [...current];
       const [moved] = next.splice(sourceIndex, 1);
@@ -322,37 +319,16 @@ function App() {
         ) : (
           <>
             <div className="card-grid">
-              {orderedResults.map((result) => {
+              {orderedResults.map((result, index) => {
                 const checkedAt = result.createdAt ?? result.lastChecked;
                 const isDetailsOpen = expandedTargets.has(result.target);
                 const isChartVisible = !hiddenChartTargets.has(result.target);
+                const isFirstCard = index === 0;
+                const isLastCard = index === orderedResults.length - 1;
                 return (
-                  <div
-                    key={result.target}
-                    className={`status-card ${result.status} ${isDetailsOpen ? 'expanded' : 'compact'} ${draggingTarget === result.target ? 'dragging' : ''}`}
-                    draggable
-                    onDragStart={(event) => {
-                      setDraggingTarget(result.target);
-                      event.dataTransfer.effectAllowed = 'move';
-                      event.dataTransfer.setData('text/plain', result.target);
-                    }}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                      event.dataTransfer.dropEffect = 'move';
-                    }}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      const sourceTarget = event.dataTransfer.getData('text/plain');
-                      moveCard(sourceTarget, result.target);
-                      setDraggingTarget(null);
-                    }}
-                    onDragEnd={() => setDraggingTarget(null)}
-                  >
+                  <div key={result.target} className={`status-card ${result.status} ${isDetailsOpen ? 'expanded' : 'compact'}`}>
                     <div className="card-header">
-                      <div className="card-title">
-                        <GripVertical className="drag-handle" size={18} aria-hidden="true" />
-                        <h2>{result.target}</h2>
-                      </div>
+                      <h2>{result.target}</h2>
                       <div className={`status-badge ${result.status}`}>
                         {result.status === 'up' ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
                         <span>{result.status.toUpperCase()}</span>
@@ -360,6 +336,28 @@ function App() {
                     </div>
 
                     <div className="card-actions">
+                      <div className="move-controls" aria-label={`${result.target}の表示位置を変更`}>
+                        <button
+                          type="button"
+                          className="move-btn"
+                          aria-label={`${result.target}を左へ移動`}
+                          title="左へ移動"
+                          disabled={isFirstCard}
+                          onClick={() => moveCardByOffset(result.target, -1)}
+                        >
+                          <ArrowLeft size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          className="move-btn"
+                          aria-label={`${result.target}を右へ移動`}
+                          title="右へ移動"
+                          disabled={isLastCard}
+                          onClick={() => moveCardByOffset(result.target, 1)}
+                        >
+                          <ArrowRight size={16} />
+                        </button>
+                      </div>
                       <button
                         type="button"
                         className={`chart-toggle ${isChartVisible ? 'active' : ''}`}
