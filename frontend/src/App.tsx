@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, RefreshCcw, CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
+import { Activity, RefreshCcw, CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronUp, Eye, EyeOff, GripVertical } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface CheckResult {
@@ -24,6 +24,7 @@ interface HistoryLog {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const HIDDEN_CHART_TARGETS_KEY = 'estat-dashboard.hidden-chart-targets';
+const CARD_ORDER_KEY_PREFIX = 'estat-dashboard.card-order';
 
 const loadHiddenChartTargets = (): Set<string> => {
   if (typeof window === 'undefined') return new Set();
@@ -48,6 +49,35 @@ const TARGET_COLORS: Record<string, string> = {
 };
 
 const colorForTarget = (target: string) => TARGET_COLORS[target] ?? '#06b6d4';
+
+const sanitizeStorageKeyPart = (value: string) => value.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+const loadCardOrder = (userId: string): string[] => {
+  if (typeof window === 'undefined') return [];
+
+  try {
+    const stored = window.localStorage.getItem(`${CARD_ORDER_KEY_PREFIX}.${sanitizeStorageKeyPart(userId)}`);
+    const targets: unknown = stored ? JSON.parse(stored) : [];
+    return Array.isArray(targets)
+      ? targets.filter((target): target is string => typeof target === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+};
+
+const applyCardOrder = (items: CheckResult[], order: string[]) => {
+  const orderIndex = new Map(order.map((target, index) => [target, index]));
+  return [...items].sort((a, b) => {
+    const aIndex = orderIndex.get(a.target);
+    const bIndex = orderIndex.get(b.target);
+
+    if (aIndex !== undefined && bIndex !== undefined) return aIndex - bIndex;
+    if (aIndex !== undefined) return -1;
+    if (bIndex !== undefined) return 1;
+    return a.target.localeCompare(b.target);
+  });
+};
 
 function StatusDot({ cx, cy, payload, target, color }: any) {
   const statusCode = payload?.[`${target}StatusCode`];
@@ -80,6 +110,10 @@ function App() {
   const [endTime, setEndTime] = useState('23:59');
   const [expandedTargets, setExpandedTargets] = useState<Set<string>>(new Set());
   const [hiddenChartTargets, setHiddenChartTargets] = useState<Set<string>>(loadHiddenChartTargets);
+  const [userId, setUserId] = useState('anonymous');
+  const [cardOrder, setCardOrder] = useState<string[]>([]);
+  const [cardOrderUserId, setCardOrderUserId] = useState('anonymous');
+  const [draggingTarget, setDraggingTarget] = useState<string | null>(null);
 
   const historyUrl = () => {
     const params = new URLSearchParams({ startDate: selectedDate, endDate: selectedDate });
@@ -129,8 +163,49 @@ function App() {
   }, [selectedDate]);
 
   useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/me`);
+        const json = await res.json();
+        if (json.success && typeof json.data?.userId === 'string') {
+          setUserId(json.data.userId);
+        }
+      } catch (err) {
+        console.error('Failed to fetch user', err);
+      }
+    };
+
+    fetchUser();
+  }, []);
+
+  useEffect(() => {
+    setCardOrder(loadCardOrder(userId));
+    setCardOrderUserId(userId);
+  }, [userId]);
+
+  useEffect(() => {
     window.localStorage.setItem(HIDDEN_CHART_TARGETS_KEY, JSON.stringify([...hiddenChartTargets]));
   }, [hiddenChartTargets]);
+
+  useEffect(() => {
+    const targets = new Set(results.map((result) => result.target));
+    const nextOrder = [
+      ...cardOrder.filter((target) => targets.has(target)),
+      ...results.map((result) => result.target).filter((target) => !cardOrder.includes(target))
+    ];
+
+    if (nextOrder.join('\u0000') !== cardOrder.join('\u0000')) {
+      setCardOrder(nextOrder);
+    }
+  }, [results, cardOrder]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || cardOrder.length === 0 || cardOrderUserId !== userId) return;
+    window.localStorage.setItem(
+      `${CARD_ORDER_KEY_PREFIX}.${sanitizeStorageKeyPart(userId)}`,
+      JSON.stringify(cardOrder)
+    );
+  }, [cardOrder, cardOrderUserId, userId]);
 
   const chartDataMap = new Map<string, Record<string, string | number | null>>();
   const timeInJapan = (date: Date) => {
@@ -191,6 +266,23 @@ function App() {
     });
   };
 
+  const moveCard = (sourceTarget: string, destinationTarget: string) => {
+    if (sourceTarget === destinationTarget) return;
+
+    setCardOrder((current) => {
+      const sourceIndex = current.indexOf(sourceTarget);
+      const destinationIndex = current.indexOf(destinationTarget);
+      if (sourceIndex === -1 || destinationIndex === -1) return current;
+
+      const next = [...current];
+      const [moved] = next.splice(sourceIndex, 1);
+      next.splice(destinationIndex, 0, moved);
+      return next;
+    });
+  };
+
+  const orderedResults = applyCardOrder(results, cardOrder);
+
   const updateStartTime = (value: string) => {
     setStartTime(value);
     if (value > endTime) setEndTime(value);
@@ -230,14 +322,37 @@ function App() {
         ) : (
           <>
             <div className="card-grid">
-              {results.map((result) => {
+              {orderedResults.map((result) => {
                 const checkedAt = result.createdAt ?? result.lastChecked;
                 const isDetailsOpen = expandedTargets.has(result.target);
                 const isChartVisible = !hiddenChartTargets.has(result.target);
                 return (
-                  <div key={result.target} className={`status-card ${result.status} ${isDetailsOpen ? 'expanded' : 'compact'}`}>
+                  <div
+                    key={result.target}
+                    className={`status-card ${result.status} ${isDetailsOpen ? 'expanded' : 'compact'} ${draggingTarget === result.target ? 'dragging' : ''}`}
+                    draggable
+                    onDragStart={(event) => {
+                      setDraggingTarget(result.target);
+                      event.dataTransfer.effectAllowed = 'move';
+                      event.dataTransfer.setData('text/plain', result.target);
+                    }}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = 'move';
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      const sourceTarget = event.dataTransfer.getData('text/plain');
+                      moveCard(sourceTarget, result.target);
+                      setDraggingTarget(null);
+                    }}
+                    onDragEnd={() => setDraggingTarget(null)}
+                  >
                     <div className="card-header">
-                      <h2>{result.target}</h2>
+                      <div className="card-title">
+                        <GripVertical className="drag-handle" size={18} aria-hidden="true" />
+                        <h2>{result.target}</h2>
+                      </div>
                       <div className={`status-badge ${result.status}`}>
                         {result.status === 'up' ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
                         <span>{result.status.toUpperCase()}</span>

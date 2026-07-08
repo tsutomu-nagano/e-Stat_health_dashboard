@@ -39,6 +39,18 @@ app.get('/api/status', async (c) => {
   });
 });
 
+app.get('/api/me', (c) => {
+  const userId =
+    c.req.header('cf-access-authenticated-user-email') ||
+    c.req.header('cf-access-user-email') ||
+    'anonymous';
+
+  return c.json({
+    success: true,
+    data: { userId }
+  });
+});
+
 app.post('/api/check-now', async (c) => {
   const results = await checkEndpoints(c.env);
   return c.json({
