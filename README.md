@@ -37,6 +37,7 @@ LINE_CHANNEL_ACCESS_TOKEN=your_line_channel_access_token
 LINE_CHANNEL_SECRET=your_line_channel_secret
 DASHBOARD_URL=http://localhost:5173
 NOTIFY_FAILURE_THRESHOLD=3
+LINE_STATUS_REPORT_ENABLED=false
 ```
 
 - `NOTIFY_FAILURE_THRESHOLD`: 通知するまでの連続失敗回数です。初期値は `3` です。Cronは `backend/wrangler.toml` で10分ごとに実行されるため、`3` の場合は約30分連続失敗で通知します。
@@ -44,6 +45,17 @@ NOTIFY_FAILURE_THRESHOLD=3
 - `LINE_CHANNEL_SECRET`: LINE Developers ConsoleのBasic settingsで確認できるチャネルシークレットです。Webhook署名検証に使います。
 - LINE Developers ConsoleのWebhook URLに `https://<backend worker domain>/api/line-webhook` を設定してください。友だち追加、メッセージ送信、ブロック、グループ参加のイベントを受け取り、通知先をD1に保存します。
 - LINE通知を使わない環境では、`LINE_CHANNEL_ACCESS_TOKEN` を未設定にできます。その場合も連続失敗状態はD1に記録されます。
+
+### テスト用の定期ステータス通知
+
+既存の障害・復旧通知とは別に、10分ごとのCronチェック結果をLINEへサマリー通知できます。
+後から切り戻しやすいように、初期状態では無効です。
+
+```bash
+LINE_STATUS_REPORT_ENABLED=true
+```
+
+- `LINE_STATUS_REPORT_ENABLED`: `true`, `1`, `yes`, `on` のいずれかを設定すると、Cronチェックごとに全監視対象のステータス確認結果をLINE通知します。未設定または `false` では送信しません。
 
 ## 必須要件
 

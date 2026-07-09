@@ -57,12 +57,13 @@ export const sendLineNotification = async (
     return false;
   }
 
-  const { results } = await env.DB.prepare(`
+  const subscriberRows = await env.DB.prepare(`
     SELECT lineId
     FROM line_subscribers
     WHERE active = 1
     ORDER BY followedAt
-  `).all<{ lineId: string }>();
+  `).all();
+  const results = (subscriberRows.results ?? []) as { lineId: string }[];
 
   if (!results.length) {
     return false;

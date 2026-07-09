@@ -59,7 +59,7 @@ const getNotificationState = async (
 ): Promise<NotificationState | null> => {
   const state = await env.DB.prepare(
     `SELECT * FROM notification_states WHERE target = ?`
-  ).bind(target).first<NotificationState>();
+  ).bind(target).first() as NotificationState | null;
 
   return state ?? null;
 };

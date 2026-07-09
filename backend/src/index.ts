@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { checkEndpoints } from './checker.js';
 import { handleLineWebhook, verifyLineSignature } from './line-webhook.js';
+import { sendLineStatusReport } from './status-report-notifier.js';
 
 type Bindings = {
   DB: any;
@@ -10,6 +11,7 @@ type Bindings = {
   LINE_CHANNEL_SECRET?: string;
   DASHBOARD_URL?: string;
   NOTIFY_FAILURE_THRESHOLD?: string;
+  LINE_STATUS_REPORT_ENABLED?: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -105,6 +107,9 @@ const query = c.env.DB.prepare(`
 export default {
   fetch: app.fetch,
   async scheduled(event: any, env: Bindings, ctx: any) {
-    ctx.waitUntil(checkEndpoints(env));
+    ctx.waitUntil((async () => {
+      const results = await checkEndpoints(env);
+      await sendLineStatusReport(env, results);
+    })());
   }
 };
