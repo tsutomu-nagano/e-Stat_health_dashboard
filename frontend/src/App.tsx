@@ -116,7 +116,7 @@ function App() {
 
   const historyUrl = () => {
     const params = new URLSearchParams({ startDate: selectedDate, endDate: selectedDate });
-    return `${API_BASE_URL}/api/history?${params.toString()}`;
+    return `${API_BASE_URL}/api/history/by-date?${params.toString()}`;
   };
 
   const fetchData = async () => {

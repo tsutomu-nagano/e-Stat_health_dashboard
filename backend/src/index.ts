@@ -79,17 +79,31 @@ app.post('/api/line-webhook', async (c) => {
 });
 
 app.get('/api/history', async (c) => {
+  const { results } = await c.env.DB.prepare(`
+    SELECT *
+    FROM logs
+    ORDER BY createdAt DESC
+    LIMIT 20000
+  `).all();
+
+  return c.json({
+    success: true,
+    data: results
+  });
+});
+
+app.get('/api/history/by-date', async (c) => {
   const startDate = c.req.query('startDate');
   const endDate = c.req.query('endDate');
 
-  if ((startDate || endDate) && (!startDate || !endDate || !DATE_PATTERN.test(startDate) || !DATE_PATTERN.test(endDate) || startDate > endDate)) {
+  if (!startDate || !endDate || !DATE_PATTERN.test(startDate) || !DATE_PATTERN.test(endDate) || startDate > endDate) {
     return c.json({
       success: false,
       error: 'startDate and endDate must be YYYY-MM-DD values, with startDate on or before endDate.'
     }, 400);
   }
 
-const query = c.env.DB.prepare(`
+  const query = c.env.DB.prepare(`
     SELECT *
     FROM logs
     WHERE createdAt >= datetime(? || ' 00:00:00', '-9 hours')
