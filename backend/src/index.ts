@@ -24,12 +24,16 @@ app.use('/api/*', cors({
 }));
 
 app.get('/api/status', async (c) => {
+  const todayStart = "datetime('now', 'start of day', '-9 hours')";
+  const tomorrowStart = "datetime('now', 'start of day', '+1 day', '-9 hours')";
   const { results } = await c.env.DB.prepare(`
     SELECT logs.*
     FROM logs
     INNER JOIN (
       SELECT target, MAX(id) AS latestId
       FROM logs
+      WHERE createdAt >= ${todayStart}
+        AND createdAt < ${tomorrowStart}
       GROUP BY target
     ) AS latest ON logs.id = latest.latestId
     ORDER BY logs.target
