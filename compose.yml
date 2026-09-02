@@ -15,7 +15,7 @@ services:
       - ./backend/.wrangler:/app/.wrangler
       # APIキーを読み込ませるため
       - ./backend/.dev.vars:/app/.dev.vars
-    restart: unless-stopped
+    # restart: unless-stopped
 
   frontend:
     build:
@@ -35,5 +35,5 @@ services:
       - VITE_API_URL=http://localhost:8787
     depends_on:
       - backend
-    restart: unless-stopped
+    # restart: unless-stopped
 
