@@ -40,7 +40,7 @@
       "id": "jstatmap",
       "name": "jSTAT MAP",
       "type": "http",
-      "url": "https://jstatmap.e-stat.go.jp/map.html",
+      "url": "https://jstatmap.e-stat.go.jp/",
       "acceptableStatusCodes": [
         200
       ]
