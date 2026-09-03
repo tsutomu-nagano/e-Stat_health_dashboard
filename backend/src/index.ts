@@ -16,6 +16,48 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>();
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const STATUS_CACHE_TTL_SECONDS = 300;
+const HISTORY_TODAY_CACHE_TTL_SECONDS = 300;
+const HISTORY_PAST_CACHE_TTL_SECONDS = 3600;
+const ALL_HISTORY_CACHE_TTL_SECONDS = 300;
+
+const todayInJapan = () =>
+  new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+
+const cachedJson = async <T>(
+  c: any,
+  ttlSeconds: number,
+  loadData: () => Promise<T>
+) => {
+  const cache = await caches.open('api-response-cache');
+  const cacheKey = new Request(c.req.url, { method: 'GET' });
+  const cached = await cache.match(cacheKey);
+
+  if (cached) {
+    return cached;
+  }
+
+  const response = Response.json(
+    {
+      success: true,
+      data: await loadData(),
+    },
+    {
+      headers: {
+        'Cache-Control': `public, max-age=${ttlSeconds}`,
+        'CDN-Cache-Control': `max-age=${ttlSeconds}`,
+      },
+    }
+  );
+
+  c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()));
+  return response;
+};
 
 app.use('/api/*', cors({
   origin: '*',
@@ -24,24 +66,23 @@ app.use('/api/*', cors({
 }));
 
 app.get('/api/status', async (c) => {
-  const todayStart = "datetime('now', 'start of day', '-9 hours')";
-  const tomorrowStart = "datetime('now', 'start of day', '+1 day', '-9 hours')";
-  const { results } = await c.env.DB.prepare(`
-    SELECT logs.*
-    FROM logs
-    INNER JOIN (
-      SELECT target, MAX(id) AS latestId
+  return cachedJson(c, STATUS_CACHE_TTL_SECONDS, async () => {
+    const todayStart = "datetime('now', 'start of day', '-9 hours')";
+    const tomorrowStart = "datetime('now', 'start of day', '+1 day', '-9 hours')";
+    const { results } = await c.env.DB.prepare(`
+      SELECT logs.*
       FROM logs
-      WHERE createdAt >= ${todayStart}
-        AND createdAt < ${tomorrowStart}
-      GROUP BY target
-    ) AS latest ON logs.id = latest.latestId
-    ORDER BY logs.target
-  `).all();
+      INNER JOIN (
+        SELECT target, MAX(id) AS latestId
+        FROM logs
+        WHERE createdAt >= ${todayStart}
+          AND createdAt < ${tomorrowStart}
+        GROUP BY target
+      ) AS latest ON logs.id = latest.latestId
+      ORDER BY logs.target
+    `).all();
 
-  return c.json({
-    success: true,
-    data: results
+    return results;
   });
 });
 
@@ -83,16 +124,15 @@ app.post('/api/line-webhook', async (c) => {
 });
 
 app.get('/api/history', async (c) => {
-  const { results } = await c.env.DB.prepare(`
-    SELECT *
-    FROM logs
-    ORDER BY createdAt DESC
-    LIMIT 20000
-  `).all();
+  return cachedJson(c, ALL_HISTORY_CACHE_TTL_SECONDS, async () => {
+    const { results } = await c.env.DB.prepare(`
+      SELECT *
+      FROM logs
+      ORDER BY createdAt DESC
+      LIMIT 20000
+    `).all();
 
-  return c.json({
-    success: true,
-    data: results
+    return results;
   });
 });
 
@@ -107,18 +147,23 @@ app.get('/api/history/by-date', async (c) => {
     }, 400);
   }
 
-  const query = c.env.DB.prepare(`
-    SELECT *
-    FROM logs
-    WHERE createdAt >= datetime(? || ' 00:00:00', '-9 hours')
-      AND createdAt < datetime(? || ' 00:00:00', '+1 day', '-9 hours')
-    ORDER BY createdAt DESC
-    LIMIT 20000
-  `).bind(startDate, endDate);
-  const { results } = await query.all();
-  return c.json({
-    success: true,
-    data: results
+  const isTodayOnly = startDate === endDate && startDate === todayInJapan();
+  const ttlSeconds = isTodayOnly
+    ? HISTORY_TODAY_CACHE_TTL_SECONDS
+    : HISTORY_PAST_CACHE_TTL_SECONDS;
+
+  return cachedJson(c, ttlSeconds, async () => {
+    const query = c.env.DB.prepare(`
+      SELECT *
+      FROM logs
+      WHERE createdAt >= datetime(? || ' 00:00:00', '-9 hours')
+        AND createdAt < datetime(? || ' 00:00:00', '+1 day', '-9 hours')
+      ORDER BY createdAt DESC
+      LIMIT 20000
+    `).bind(startDate, endDate);
+    const { results } = await query.all();
+
+    return results;
   });
 });
 
@@ -126,8 +171,27 @@ export default {
   fetch: app.fetch,
   async scheduled(event: any, env: Bindings, ctx: any) {
     ctx.waitUntil((async () => {
-      const results = await checkEndpoints(env);
-      await sendLineStatusReport(env, results);
+      const startedAt = new Date().toISOString();
+      console.log(
+        `[cron] started: cron=${event.cron ?? 'unknown'} scheduledTime=${event.scheduledTime ?? 'unknown'} startedAt=${startedAt}`
+      );
+
+      try {
+        const results = await checkEndpoints(env);
+        console.log(
+          `[cron] checks completed: ${results
+            .map((result) => `${result.target}=${result.status}${result.statusCode ? `(${result.statusCode})` : ''}`)
+            .join(', ')}`
+        );
+
+        try {
+          await sendLineStatusReport(env, results);
+        } catch (err) {
+          console.error('[cron] failed to send LINE status report', err);
+        }
+      } catch (err) {
+        console.error('[cron] failed to run endpoint checks', err);
+      }
     })());
   }
 };

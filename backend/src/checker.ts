@@ -141,6 +141,7 @@ const handleNotificationState = async (env: Env, result: CheckResult) => {
 
 const checkTarget = async (env: Env, target: TargetConfig): Promise<CheckResult> => {
   const lastChecked = new Date().toISOString();
+  console.log(`[check] ${target.name} started`);
 
   try {
     if (target.type === 'estat-api' && !env.ESTAT_APP_ID) {
@@ -179,6 +180,7 @@ const checkTarget = async (env: Env, target: TargetConfig): Promise<CheckResult>
       error
     };
     await saveResult(env, result);
+    console.log(`[check] ${target.name} saved: ${result.status}${result.statusCode ? `(${result.statusCode})` : ''}`);
     await handleNotificationState(env, result);
     return result;
   } catch (err: any) {
@@ -189,6 +191,7 @@ const checkTarget = async (env: Env, target: TargetConfig): Promise<CheckResult>
       error: err instanceof Error ? err.message : String(err)
     };
     await saveResult(env, result);
+    console.log(`[check] ${target.name} saved: ${result.status} error=${result.error ?? 'unknown'}`);
     await handleNotificationState(env, result);
     return result;
   }
