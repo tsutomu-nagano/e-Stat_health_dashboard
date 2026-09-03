@@ -16,6 +16,7 @@ type TargetConfig = {
   type: 'http' | 'estat-api';
   url: string;
   acceptableStatusCodes?: number[];
+  timeoutMs?: number;
 };
 
 type Env = {
@@ -35,6 +36,7 @@ type NotificationState = {
 };
 
 const targets = targetsConfig.targets as TargetConfig[];
+const DEFAULT_CHECK_TIMEOUT_MS = 120000;
 
 const saveResult = async (env: Env, result: CheckResult) => {
   await env.DB.prepare(
@@ -142,6 +144,9 @@ const handleNotificationState = async (env: Env, result: CheckResult) => {
 const checkTarget = async (env: Env, target: TargetConfig): Promise<CheckResult> => {
   const lastChecked = new Date().toISOString();
   console.log(`[check] ${target.name} started`);
+  const timeoutMs = target.timeoutMs ?? DEFAULT_CHECK_TIMEOUT_MS;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     if (target.type === 'estat-api' && !env.ESTAT_APP_ID) {
@@ -153,7 +158,9 @@ const checkTarget = async (env: Env, target: TargetConfig): Promise<CheckResult>
       encodeURIComponent(env.ESTAT_APP_ID ?? '')
     );
     const start = Date.now();
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      signal: controller.signal,
+    });
     const responseTimeMs = Date.now() - start;
     const expectedStatus = target.acceptableStatusCodes ?? [200];
     let status: CheckResult['status'] = expectedStatus.includes(response.status) ? 'up' : 'down';
@@ -184,16 +191,26 @@ const checkTarget = async (env: Env, target: TargetConfig): Promise<CheckResult>
     await handleNotificationState(env, result);
     return result;
   } catch (err: any) {
+    const isTimeout =
+      err instanceof Error &&
+      (err.name === 'AbortError' || controller.signal.aborted);
     const result: CheckResult = {
       target: target.name,
       status: 'down',
       lastChecked,
-      error: err instanceof Error ? err.message : String(err)
+      responseTimeMs: isTimeout ? timeoutMs : undefined,
+      error: isTimeout
+        ? `Request timed out after ${timeoutMs} ms`
+        : err instanceof Error
+          ? err.message
+          : String(err)
     };
     await saveResult(env, result);
     console.log(`[check] ${target.name} saved: ${result.status} error=${result.error ?? 'unknown'}`);
     await handleNotificationState(env, result);
     return result;
+  } finally {
+    clearTimeout(timeoutId);
   }
 };
 
