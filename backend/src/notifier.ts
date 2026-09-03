@@ -14,7 +14,7 @@ const isLineEnabled = (env: NotificationEnv): boolean =>
 const buildMessage = (
   kind: NotificationKind,
   result: CheckResult,
-  consecutiveFailures: number,
+  consecutiveChecks: number,
   dashboardUrl?: string
 ): string => {
   const title = kind === 'failure' ? '障害検知' : '復旧検知';
@@ -28,7 +28,9 @@ const buildMessage = (
     `対象: ${result.target}`,
     `状態: ${result.status}`,
     `HTTPステータス: ${result.statusCode ?? 'N/A'}`,
-    `連続失敗回数: ${consecutiveFailures}`,
+    kind === 'failure'
+      ? `連続失敗回数: ${consecutiveChecks}`
+      : `連続正常回数: ${consecutiveChecks}`,
     `確認時刻: ${result.lastChecked}`,
   ];
 
@@ -51,7 +53,7 @@ export const sendLineNotification = async (
   env: NotificationEnv,
   kind: NotificationKind,
   result: CheckResult,
-  consecutiveFailures: number
+  consecutiveChecks: number
 ): Promise<boolean> => {
   if (!isLineEnabled(env)) {
     return false;
@@ -72,7 +74,7 @@ export const sendLineNotification = async (
   const text = buildMessage(
     kind,
     result,
-    consecutiveFailures,
+    consecutiveChecks,
     env.DASHBOARD_URL
   );
 

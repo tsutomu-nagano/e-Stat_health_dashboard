@@ -11,6 +11,7 @@ type Bindings = {
   LINE_CHANNEL_SECRET?: string;
   DASHBOARD_URL?: string;
   NOTIFY_FAILURE_THRESHOLD?: string;
+  NOTIFY_RECOVERY_THRESHOLD?: string;
   LINE_STATUS_REPORT_ENABLED?: string;
 };
 

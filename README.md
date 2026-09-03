@@ -37,10 +37,12 @@ LINE_CHANNEL_ACCESS_TOKEN=your_line_channel_access_token
 LINE_CHANNEL_SECRET=your_line_channel_secret
 DASHBOARD_URL=http://localhost:5173
 NOTIFY_FAILURE_THRESHOLD=3
+NOTIFY_RECOVERY_THRESHOLD=1
 LINE_STATUS_REPORT_ENABLED=false
 ```
 
 - `NOTIFY_FAILURE_THRESHOLD`: 通知するまでの連続失敗回数です。初期値は `3` です。Cronは `backend/wrangler.toml` で10分ごとに実行されるため、`3` の場合は約30分連続失敗で通知します。
+- `NOTIFY_RECOVERY_THRESHOLD`: 障害通知後、復旧通知を送るまでの連続正常回数です。初期値は `1` です。例えば `3` の場合、3回連続で正常と判定された時点で復旧通知します。
 - `LINE_CHANNEL_ACCESS_TOKEN`: LINE Developers Consoleで作成したMessaging APIチャネルのチャネルアクセストークンです。
 - `LINE_CHANNEL_SECRET`: LINE Developers ConsoleのBasic settingsで確認できるチャネルシークレットです。Webhook署名検証に使います。
 - LINE Developers ConsoleのWebhook URLに `https://<backend worker domain>/api/line-webhook` を設定してください。友だち追加、メッセージ送信、ブロック、グループ参加のイベントを受け取り、通知先をD1に保存します。

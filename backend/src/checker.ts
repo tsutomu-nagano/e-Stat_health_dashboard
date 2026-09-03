@@ -23,11 +23,13 @@ type Env = {
   DB: any;
   ESTAT_APP_ID?: string;
   NOTIFY_FAILURE_THRESHOLD?: string;
+  NOTIFY_RECOVERY_THRESHOLD?: string;
 } & NotificationEnv;
 
 type NotificationState = {
   target: string;
   consecutiveFailures: number;
+  consecutiveSuccesses: number;
   notifiedAt: string | null;
   recoveredAt: string | null;
   lastStatusCode: number | null;
@@ -55,6 +57,11 @@ const failureThreshold = (env: Env): number => {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 3;
 };
 
+const recoveryThreshold = (env: Env): number => {
+  const parsed = Number(env.NOTIFY_RECOVERY_THRESHOLD ?? '1');
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+};
+
 const getNotificationState = async (
   env: Env,
   target: string
@@ -70,6 +77,7 @@ const upsertNotificationState = async (
   env: Env,
   result: CheckResult,
   consecutiveFailures: number,
+  consecutiveSuccesses: number,
   notifiedAt: string | null,
   recoveredAt: string | null
 ) => {
@@ -77,14 +85,16 @@ const upsertNotificationState = async (
     INSERT INTO notification_states (
       target,
       consecutiveFailures,
+      consecutiveSuccesses,
       notifiedAt,
       recoveredAt,
       lastStatusCode,
       lastError,
       updatedAt
-    ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(target) DO UPDATE SET
       consecutiveFailures = excluded.consecutiveFailures,
+      consecutiveSuccesses = excluded.consecutiveSuccesses,
       notifiedAt = excluded.notifiedAt,
       recoveredAt = excluded.recoveredAt,
       lastStatusCode = excluded.lastStatusCode,
@@ -93,6 +103,7 @@ const upsertNotificationState = async (
   `).bind(
     result.target,
     consecutiveFailures,
+    consecutiveSuccesses,
     notifiedAt,
     recoveredAt,
     result.statusCode ?? null,
@@ -107,10 +118,32 @@ const handleNotificationState = async (env: Env, result: CheckResult) => {
 
     if (result.status === 'up') {
       if (state?.notifiedAt) {
-        await sendLineNotification(env, 'recovery', result, 0);
+        const consecutiveSuccesses = (state.consecutiveSuccesses ?? 0) + 1;
+        if (consecutiveSuccesses >= recoveryThreshold(env)) {
+          const sent = await sendLineNotification(
+            env,
+            'recovery',
+            result,
+            consecutiveSuccesses
+          );
+          if (sent) {
+            await upsertNotificationState(env, result, 0, 0, null, now);
+            return;
+          }
+        }
+
+        await upsertNotificationState(
+          env,
+          result,
+          0,
+          consecutiveSuccesses,
+          state.notifiedAt,
+          state.recoveredAt
+        );
+        return;
       }
 
-      await upsertNotificationState(env, result, 0, null, now);
+      await upsertNotificationState(env, result, 0, 0, null, now);
       return;
     }
 
@@ -133,6 +166,7 @@ const handleNotificationState = async (env: Env, result: CheckResult) => {
       env,
       result,
       consecutiveFailures,
+      0,
       notifiedAt,
       state?.recoveredAt ?? null
     );
