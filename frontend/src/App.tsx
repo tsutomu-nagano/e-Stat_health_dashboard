@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Activity, RefreshCcw, CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronUp, Eye, EyeOff, ArrowLeft, ArrowRight } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceArea, ReferenceLine } from 'recharts';
 
 interface CheckResult {
   target: string;
@@ -16,8 +16,8 @@ interface HistoryLog {
   id: number;
   target: string;
   status: string;
-  statusCode: number;
-  responseTimeMs: number;
+  statusCode: number | null;
+  responseTimeMs: number | null;
   error: string | null;
   createdAt: string;
 }
@@ -80,8 +80,12 @@ const applyCardOrder = (items: CheckResult[], order: string[]) => {
 };
 
 function StatusDot({ cx, cy, payload, target, color }: any) {
-  const statusCode = payload?.[`${target}StatusCode`];
-  if (statusCode !== undefined && statusCode !== 200) {
+  if (payload?.[target] == null || typeof cx !== 'number' || typeof cy !== 'number') {
+    return null;
+  }
+
+  const status = payload?.[`${target}Status`];
+  if (status === 'down') {
     return (
       <g>
         <circle cx={cx} cy={cy} r={7} fill="#ef4444" stroke="#fee2e2" strokeWidth={1} />
@@ -91,6 +95,46 @@ function StatusDot({ cx, cy, payload, target, color }: any) {
   }
 
   return <circle cx={cx} cy={cy} r={4} fill={color} stroke="#ffffff" strokeWidth={1} />;
+}
+
+function ChartTooltip({ active, payload, label, targets }: any) {
+  const point = payload?.[0]?.payload;
+  if (!active || !point) return null;
+
+  const failedTargets = Object.keys(point)
+    .filter((key) => key.endsWith('Status') && String(point[key]).toLowerCase() === 'down')
+    .map((key) => key.slice(0, -'Status'.length));
+  const items = Array.from(new Set<string>([...(targets ?? []), ...failedTargets]));
+
+  return (
+    <div className="chart-tooltip">
+      <div className="chart-tooltip-time">{label}</div>
+      {items.map((target: string) => {
+        const hasData = Object.prototype.hasOwnProperty.call(point, `${target}Status`);
+        const failed = String(point[`${target}Status`]).toLowerCase() === 'down';
+        const statusCode = point[`${target}StatusCode`];
+        const error = point[`${target}Error`];
+
+        return (
+          <div key={target} className={`chart-tooltip-item${failed ? ' failed' : ''}`}>
+            <div className="chart-tooltip-service">
+              <span className="chart-tooltip-color" style={{ backgroundColor: failed ? '#ef4444' : colorForTarget(target) }} />
+              <span>{target}</span>
+              {failed && <span className="chart-tooltip-failure">応答エラー</span>}
+              {!hasData && <span className="chart-tooltip-no-data">データなし</span>}
+            </div>
+            {hasData && (
+              <div className="chart-tooltip-details">
+                <span>応答時間: {point[target] != null ? `${point[target]} ms` : 'N/A'}</span>
+                {statusCode != null && <span>HTTP: {statusCode}</span>}
+              </div>
+            )}
+            {failed && error && <div className="chart-tooltip-error">{error}</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 const todayInJapan = () => new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Asia/Tokyo',
@@ -232,14 +276,28 @@ function App() {
       chartDataMap.set(time, { time });
     }
     const entry = chartDataMap.get(time)!;
-    entry[log.target] = log.responseTimeMs ?? null;
+    // 応答エラー時のタイムアウト値などを応答時間としてプロットしない。
+    // ステータス情報は残し、同時刻にある他サービスのツールチップで表示する。
+    entry[log.target] = log.status === 'up' ? (log.responseTimeMs ?? null) : null;
     entry[`${log.target}StatusCode`] = log.statusCode;
+    entry[`${log.target}Status`] = log.status;
+    entry[`${log.target}Error`] = log.error;
   });
 
   const chartData = Array.from(chartDataMap.values());
+  const downTimes = new Set(
+    chartData
+      .filter((point) => Object.keys(point).some(
+        (key) => key.endsWith('Status') && String(point[key]).toLowerCase() === 'down'
+      ))
+      .map((point) => String(point.time))
+  );
   const chartTargets = Array.from(
     new Set(filteredHistory.filter((log) => !hiddenChartTargets.has(log.target)).map((log) => log.target))
   );
+  const tooltipTargets = Array.from(
+    new Set([...results.map((result) => result.target), ...chartTargets])
+  ).filter((target) => !hiddenChartTargets.has(target));
 
   const toggleTargetDetails = (target: string) => {
     setExpandedTargets((current) => {
@@ -433,15 +491,37 @@ function App() {
               </div>
               {chartData.length > 0 ? (
                 <div className="chart-wrapper">
+                  <div className="chart-failure-key"><span />応答エラーあり</div>
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                    <LineChart data={chartData} margin={{ top: 20, right: 30, left: 8, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                       <XAxis dataKey="time" stroke="#94a3b8" tick={{ fill: '#94a3b8' }} />
-                      <YAxis stroke="#94a3b8" tick={{ fill: '#94a3b8' }} unit="ms" />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                        itemStyle={{ color: '#f8fafc' }}
-                      />
+                      <YAxis width={88} stroke="#94a3b8" tick={{ fill: '#94a3b8' }} unit="ms" />
+                      {chartData.map((point, index) => {
+                        const time = String(point.time);
+                        if (!downTimes.has(time)) return null;
+
+                        const nextTime = chartData[index + 1]?.time;
+                        return nextTime != null ? (
+                          <ReferenceArea
+                            key={`down-${time}`}
+                            x1={time}
+                            x2={String(nextTime)}
+                            fill="#ef4444"
+                            fillOpacity={0.12}
+                            strokeOpacity={0}
+                          />
+                        ) : (
+                          <ReferenceLine
+                            key={`down-${time}`}
+                            x={time}
+                            stroke="#ef4444"
+                            strokeOpacity={0.18}
+                            strokeWidth={16}
+                          />
+                        );
+                      })}
+                      <Tooltip content={(props) => <ChartTooltip {...props} targets={tooltipTargets} />} />
                       <Legend />
                       {chartTargets.map((target, index) => (
                         <Line
@@ -453,7 +533,7 @@ function App() {
                           strokeWidth={3}
                           dot={(props) => <StatusDot {...props} target={target} color={colorForTarget(target)} />}
                           activeDot={{ r: 6 }}
-                          connectNulls
+                          connectNulls={false}
                         />
                       ))}
                     </LineChart>

@@ -41,15 +41,29 @@ const targets = targetsConfig.targets as TargetConfig[];
 const DEFAULT_CHECK_TIMEOUT_MS = 120000;
 
 const saveResult = async (env: Env, result: CheckResult) => {
-  await env.DB.prepare(
-    `INSERT INTO logs (target, status, statusCode, responseTimeMs, error) VALUES (?, ?, ?, ?, ?)`
-  ).bind(
+  const values = [
     result.target,
     result.status,
     result.statusCode ?? null,
     result.responseTimeMs ?? null,
     result.error ?? null
-  ).run();
+  ];
+
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO logs (target, status, statusCode, responseTimeMs, error) VALUES (?, ?, ?, ?, ?)`
+    ).bind(...values),
+    env.DB.prepare(`
+      INSERT INTO latest (target, status, statusCode, responseTimeMs, error, createdAt)
+      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(target) DO UPDATE SET
+        status = excluded.status,
+        statusCode = excluded.statusCode,
+        responseTimeMs = excluded.responseTimeMs,
+        error = excluded.error,
+        createdAt = CURRENT_TIMESTAMP
+    `).bind(...values)
+  ]);
 };
 
 const failureThreshold = (env: Env): number => {
