@@ -208,7 +208,7 @@ h1 {
   pointer-events: none;
 }
 
-.chart-failure-key span { width: 1rem; height: 0.55rem; border-radius: 2px; background: rgba(239, 68, 68, 0.2); }
+.chart-failure-key span { width: 1rem; height: 0.55rem; border-radius: 2px; background: rgba(239, 68, 68, 0.4); }
 
 .chart-tooltip {
   min-width: 220px;

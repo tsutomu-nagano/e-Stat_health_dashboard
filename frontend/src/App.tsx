@@ -508,7 +508,7 @@ function App() {
                             x1={time}
                             x2={String(nextTime)}
                             fill="#ef4444"
-                            fillOpacity={0.12}
+                            fillOpacity={0.24}
                             strokeOpacity={0}
                           />
                         ) : (
@@ -516,7 +516,7 @@ function App() {
                             key={`down-${time}`}
                             x={time}
                             stroke="#ef4444"
-                            strokeOpacity={0.18}
+                            strokeOpacity={0.36}
                             strokeWidth={16}
                           />
                         );
