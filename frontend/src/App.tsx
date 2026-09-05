@@ -387,6 +387,12 @@ function App() {
 
   const orderedResults = applyCardOrder(results, cardOrder);
 
+  const updateSelectedDate = (value: string) => {
+    setSelectedDate(value);
+    setStartTime('00:00');
+    setEndTime('23:59');
+  };
+
   const updateStartTime = (value: string) => {
     setStartTime(value);
     if (value > endTime) setEndTime(value);
@@ -525,7 +531,7 @@ function App() {
                 <div className="date-range-selector">
                   <label>
                     日付
-                    <input type="date" value={selectedDate} max={today} onChange={(event) => setSelectedDate(event.target.value)} />
+                    <input type="date" value={selectedDate} max={today} onChange={(event) => updateSelectedDate(event.target.value)} />
                   </label>
                   <label>
                     開始時刻
