@@ -68,13 +68,9 @@ app.use('/api/*', cors({
 
 app.get('/api/status', async (c) => {
   return cachedJson(c, STATUS_CACHE_TTL_SECONDS, async () => {
-    const todayStart = "datetime('now', 'start of day', '-9 hours')";
-    const tomorrowStart = "datetime('now', 'start of day', '+1 day', '-9 hours')";
     const { results } = await c.env.DB.prepare(`
       SELECT *
       FROM latest
-      WHERE createdAt >= ${todayStart}
-        AND createdAt < ${tomorrowStart}
       ORDER BY target
     `).all();
 
