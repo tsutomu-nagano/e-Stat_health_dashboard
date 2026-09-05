@@ -25,6 +25,50 @@ interface HistoryLog {
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const HIDDEN_CHART_TARGETS_KEY = 'estat-dashboard.hidden-chart-targets';
 const CARD_ORDER_KEY_PREFIX = 'estat-dashboard.card-order';
+const CHART_FILTERS_KEY = 'estat-dashboard.chart-filters';
+
+type ChartFilters = {
+  selectedDate: string;
+  startTime: string;
+  endTime: string;
+};
+
+const isValidDate = (value: unknown, today: string): value is string => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || value > today) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+};
+
+const isValidTime = (value: unknown): value is string =>
+  typeof value === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
+
+const loadChartFilters = (today: string): ChartFilters => {
+  const defaults = { selectedDate: today, startTime: '00:00', endTime: '23:59' };
+  if (typeof window === 'undefined') return defaults;
+
+  try {
+    const stored = window.localStorage.getItem(CHART_FILTERS_KEY);
+    if (!stored) return defaults;
+
+    const parsed: unknown = JSON.parse(stored);
+    if (!parsed || typeof parsed !== 'object') return defaults;
+    const filters = parsed as Partial<ChartFilters>;
+    if (
+      !isValidDate(filters.selectedDate, today) ||
+      !isValidTime(filters.startTime) ||
+      !isValidTime(filters.endTime) ||
+      filters.startTime > filters.endTime
+    ) return defaults;
+
+    return {
+      selectedDate: filters.selectedDate,
+      startTime: filters.startTime,
+      endTime: filters.endTime
+    };
+  } catch {
+    return defaults;
+  }
+};
 
 const loadHiddenChartTargets = (): Set<string> => {
   if (typeof window === 'undefined') return new Set();
@@ -145,13 +189,14 @@ const todayInJapan = () => new Intl.DateTimeFormat('en-CA', {
 
 function App() {
   const today = todayInJapan();
+  const [initialChartFilters] = useState(() => loadChartFilters(today));
   const [results, setResults] = useState<CheckResult[]>([]);
   const [history, setHistory] = useState<HistoryLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(today);
-  const [startTime, setStartTime] = useState('00:00');
-  const [endTime, setEndTime] = useState('23:59');
+  const [selectedDate, setSelectedDate] = useState(initialChartFilters.selectedDate);
+  const [startTime, setStartTime] = useState(initialChartFilters.startTime);
+  const [endTime, setEndTime] = useState(initialChartFilters.endTime);
   const [expandedTargets, setExpandedTargets] = useState<Set<string>>(new Set());
   const [hiddenChartTargets, setHiddenChartTargets] = useState<Set<string>>(loadHiddenChartTargets);
   const [userId, setUserId] = useState('anonymous');
@@ -229,6 +274,10 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(HIDDEN_CHART_TARGETS_KEY, JSON.stringify([...hiddenChartTargets]));
   }, [hiddenChartTargets]);
+
+  useEffect(() => {
+    window.localStorage.setItem(CHART_FILTERS_KEY, JSON.stringify({ selectedDate, startTime, endTime }));
+  }, [selectedDate, startTime, endTime]);
 
   useEffect(() => {
     const targets = new Set(results.map((result) => result.target));
