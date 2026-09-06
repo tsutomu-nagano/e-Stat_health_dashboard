@@ -187,7 +187,7 @@ const todayInJapan = () => new Intl.DateTimeFormat('en-CA', {
   day: '2-digit'
 }).format(new Date());
 
-// グラフとタイムラインを同時に描画せず、画面幅の変更にも追従する。
+// 画面幅の変更に合わせてグラフの向きを切り替える。
 function useMobileLayout() {
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 700px)').matches);
   useEffect(() => {
@@ -198,61 +198,6 @@ function useMobileLayout() {
     return () => media.removeEventListener('change', update);
   }, []);
   return isMobile;
-}
-
-function HistoryTimeline({ logs }: { logs: HistoryLog[] }) {
-  const [visibleCount, setVisibleCount] = useState(12);
-  const groups = new Map<string, HistoryLog[]>();
-  [...logs].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id).forEach((log) => {
-    // 09:10〜09:19の記録を09:10の枠にまとめる（切り捨て）。
-    const minute = log.createdAt.slice(0, 15) + '0';
-    const group = groups.get(minute) ?? [];
-    group.push(log);
-    groups.set(minute, group);
-  });
-  const entries = [...groups.entries()];
-
-  return (
-    <div className="history-timeline">
-      <p className="timeline-caption">新しい記録から表示 · 日本時間 · 10分ごとに記録をまとめています</p>
-      {entries.length === 0 ? (
-        <p className="empty-history">表示するサービスがありません。カードの目のボタンで表示できます。</p>
-      ) : (
-        <>
-          <ol className="timeline-list" aria-label="稼働履歴タイムライン">
-            {entries.slice(0, visibleCount).map(([minute, records]) => (
-              <li key={minute} className="timeline-group">
-                <h3><time dateTime={minute.replace(' ', 'T') + ':00Z'}>
-                  {new Date(minute.replace(' ', 'T') + ':00Z').toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' })}
-                </time></h3>
-                <ul className="timeline-records">
-                  {records.map((log) => (
-                    <li key={log.id} className={`timeline-record ${log.status === 'up' ? 'up' : 'down'}`}>
-                      <div className="timeline-record-heading">
-                        <span className="timeline-service">{log.target}</span>
-                        <span className={`status-badge ${log.status === 'up' ? 'up' : 'down'}`}>
-                          {log.status === 'up' ? <CheckCircle2 size={16} aria-hidden="true" /> : <XCircle size={16} aria-hidden="true" />}
-                          {log.status === 'up' ? '正常' : 'エラー'}
-                        </span>
-                      </div>
-                      <div className="timeline-metrics">
-                        <span>応答時間 <strong>{log.status === 'up' && log.responseTimeMs != null ? `${log.responseTimeMs.toLocaleString('ja-JP')} ms` : '—'}</strong></span>
-                        <span>HTTP {log.statusCode ?? '—'}</span>
-                      </div>
-                      {log.error && <details className="timeline-error"><summary>エラー詳細</summary><p>{log.error}</p></details>}
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ol>
-          {visibleCount < entries.length && (
-            <button type="button" className="timeline-more" onClick={() => setVisibleCount((count) => count + 12)}>以前の記録を表示</button>
-          )}
-        </>
-      )}
-    </div>
-  );
 }
 
 function App() {
@@ -387,7 +332,7 @@ function App() {
   [...filteredHistory].reverse().forEach(log => {
     const logDate = new Date(log.createdAt + 'Z');
     const coeff = 1000 * 60 * 10;
-    const roundedDate = new Date(Math.round(logDate.getTime() / coeff) * coeff);
+    const roundedDate = new Date((isMobile ? Math.floor(logDate.getTime() / coeff) : Math.round(logDate.getTime() / coeff)) * coeff);
     const time = roundedDate.toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' });
 
     if (!chartDataMap.has(time)) {
@@ -403,6 +348,9 @@ function App() {
   });
 
   const chartData = Array.from(chartDataMap.values());
+  const displayChartData = isMobile
+    ? [...chartData].sort((a, b) => String(b.time).localeCompare(String(a.time)))
+    : chartData;
   const downTimes = new Set(
     chartData
       .filter((point) => Object.keys(point).some(
@@ -596,7 +544,7 @@ function App() {
 
             <div className="chart-container">
               <div className="chart-header">
-                <h2>{isMobile ? '稼働履歴タイムライン' : 'Response Time History'}</h2>
+                <h2>{isMobile ? '応答時間の縦グラフ' : 'Response Time History'}</h2>
                 <div className="date-range-selector">
                   <label>
                     日付
@@ -613,29 +561,25 @@ function App() {
                   </label>
                 </div>
               </div>
-              {chartData.length > 0 ? (isMobile ? (
-                <HistoryTimeline
-                  key={`${selectedDate}/${startTime}/${endTime}/${[...hiddenChartTargets].sort().join(',')}`}
-                  logs={filteredHistory.filter((log) => !hiddenChartTargets.has(log.target))}
-                />
-              ) : (
-                <div className="chart-wrapper">
+              {chartData.length > 0 ? (
+                <>
+                {isMobile && <p className="vertical-chart-caption">縦軸：時刻（日本時間・新しい順）／横軸：応答時間（ms）<br />上下にスクロールし、グラフをタップすると詳細を確認できます。</p>}
+                <div className={`chart-wrapper${isMobile ? ' vertical-chart' : ''}`} style={isMobile ? { height: Math.max(480, displayChartData.length * 48 + 140) } : undefined}>
                   <div className="chart-failure-key"><span />応答エラーあり</div>
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData} margin={{ top: 20, right: 30, left: 8, bottom: 0 }}>
+                    <LineChart data={displayChartData} layout={isMobile ? 'vertical' : 'horizontal'} margin={isMobile ? { top: 30, right: 20, left: 0, bottom: 16 } : { top: 20, right: 30, left: 8, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                      <XAxis dataKey="time" stroke="#94a3b8" tick={{ fill: '#94a3b8' }} />
-                      <YAxis width={88} stroke="#94a3b8" tick={{ fill: '#94a3b8' }} unit="ms" />
-                      {chartData.map((point, index) => {
+                      <XAxis type={isMobile ? 'number' : 'category'} dataKey={isMobile ? undefined : 'time'} orientation={isMobile ? 'top' : 'bottom'} stroke="#94a3b8" tick={{ fill: '#94a3b8', fontSize: isMobile ? 11 : 12 }} tickCount={isMobile ? 3 : undefined} />
+                      <YAxis type={isMobile ? 'category' : 'number'} dataKey={isMobile ? 'time' : undefined} interval={isMobile ? 0 : undefined} width={isMobile ? 52 : 88} stroke="#94a3b8" tick={{ fill: '#94a3b8', fontSize: 12 }} unit={isMobile ? undefined : 'ms'} />
+                      {displayChartData.map((point, index) => {
                         const time = String(point.time);
                         if (!downTimes.has(time)) return null;
 
-                        const nextTime = chartData[index + 1]?.time;
+                        const nextTime = displayChartData[index + 1]?.time;
                         return nextTime != null ? (
                           <ReferenceArea
                             key={`down-${time}`}
-                            x1={time}
-                            x2={String(nextTime)}
+                            {...(isMobile ? { y1: time, y2: String(nextTime) } : { x1: time, x2: String(nextTime) })}
                             fill="#ef4444"
                             fillOpacity={0.24}
                             strokeOpacity={0}
@@ -643,15 +587,15 @@ function App() {
                         ) : (
                           <ReferenceLine
                             key={`down-${time}`}
-                            x={time}
+                            {...(isMobile ? { y: time } : { x: time })}
                             stroke="#ef4444"
                             strokeOpacity={0.36}
                             strokeWidth={16}
                           />
                         );
                       })}
-                      <Tooltip content={(props) => <ChartTooltip {...props} targets={tooltipTargets} />} />
-                      <Legend />
+                      <Tooltip position={isMobile ? { x: 0 } : undefined} content={(props) => <ChartTooltip {...props} targets={tooltipTargets} />} />
+                      <Legend verticalAlign={isMobile ? "top" : "bottom"} wrapperStyle={isMobile ? { paddingBottom: 16, fontSize: 12 } : undefined} />
                       {chartTargets.map((target, index) => (
                         <Line
                           key={target}
@@ -668,7 +612,8 @@ function App() {
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
-              )) : (
+                </>
+              ) : (
                 <div className="empty-history">選択した期間の履歴データはありません。</div>
               )}
             </div>
