@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Activity, RefreshCcw, CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronUp, Eye, EyeOff, ArrowLeft, ArrowRight } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceArea, ReferenceLine } from 'recharts';
 
@@ -141,8 +142,50 @@ function StatusDot({ cx, cy, payload, target, color }: any) {
   return <circle cx={cx} cy={cy} r={4} fill={color} stroke="#ffffff" strokeWidth={1} />;
 }
 
-function ChartTooltip({ active, payload, label, targets }: any) {
+function ChartTooltip({ active, payload, label, targets, coordinate, isMobile }: any) {
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
   const point = payload?.[0]?.payload;
+
+  useLayoutEffect(() => {
+    if (!isMobile || !active || !point) return;
+    const updatePosition = () => {
+      const chart = anchorRef.current?.closest('.recharts-wrapper');
+      const tooltip = tooltipRef.current;
+      if (!chart || !tooltip) return;
+      const viewport = window.visualViewport;
+      const left = (viewport?.offsetLeft ?? 0) + 8;
+      const top = (viewport?.offsetTop ?? 0) + 8;
+      const width = Math.max(0, (viewport?.width ?? window.innerWidth) - 16);
+      const height = Math.max(0, (viewport?.height ?? window.innerHeight) - 16);
+      tooltip.style.maxHeight = `${height}px`;
+      tooltip.style.width = `${Math.min(280, width)}px`;
+      const bounds = chart.getBoundingClientRect();
+      const anchorY = bounds.top + (coordinate?.y ?? 0);
+      const tooltipHeight = tooltip.getBoundingClientRect().height;
+      // 下側に収まらなければ上側へ移動し、最後に表示領域内へ収める。
+      const preferredY = anchorY + 12 + tooltipHeight <= top + height
+        ? anchorY + 12
+        : anchorY - 12 - tooltipHeight;
+      tooltip.style.top = `${Math.max(top, Math.min(preferredY, top + height - tooltipHeight))}px`;
+      tooltip.style.left = `${Math.max(left, Math.min(bounds.left, left + width - tooltip.offsetWidth))}px`;
+    };
+    updatePosition();
+    const observer = new ResizeObserver(updatePosition);
+    if (tooltipRef.current) observer.observe(tooltipRef.current);
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+    window.visualViewport?.addEventListener('resize', updatePosition);
+    window.visualViewport?.addEventListener('scroll', updatePosition);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+      window.visualViewport?.removeEventListener('resize', updatePosition);
+      window.visualViewport?.removeEventListener('scroll', updatePosition);
+    };
+  }, [isMobile, active, point, coordinate?.y]);
+
   if (!active || !point) return null;
 
   const failedTargets = Object.keys(point)
@@ -150,8 +193,8 @@ function ChartTooltip({ active, payload, label, targets }: any) {
     .map((key) => key.slice(0, -'Status'.length));
   const items = Array.from(new Set<string>([...(targets ?? []), ...failedTargets]));
 
-  return (
-    <div className="chart-tooltip">
+  const content = (
+    <div ref={tooltipRef} className={`chart-tooltip${isMobile ? ' chart-tooltip-mobile' : ''}`}>
       <div className="chart-tooltip-time">{label}</div>
       {items.map((target: string) => {
         const hasData = Object.prototype.hasOwnProperty.call(point, `${target}Status`);
@@ -179,6 +222,9 @@ function ChartTooltip({ active, payload, label, targets }: any) {
       })}
     </div>
   );
+  return isMobile
+    ? <><span ref={anchorRef} />{createPortal(content, document.body)}</>
+    : content;
 }
 const todayInJapan = () => new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Asia/Tokyo',
@@ -594,7 +640,7 @@ function App() {
                           />
                         );
                       })}
-                      <Tooltip position={isMobile ? { x: 0 } : undefined} content={(props) => <ChartTooltip {...props} targets={tooltipTargets} />} />
+                      <Tooltip position={isMobile ? { x: 0 } : undefined} content={<ChartTooltip targets={tooltipTargets} isMobile={isMobile} />} />
                       <Legend verticalAlign={isMobile ? "top" : "bottom"} wrapperStyle={isMobile ? { paddingBottom: 16, fontSize: 12 } : undefined} />
                       {chartTargets.map((target, index) => (
                         <Line
