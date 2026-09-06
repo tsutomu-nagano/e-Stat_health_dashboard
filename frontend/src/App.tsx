@@ -187,7 +187,76 @@ const todayInJapan = () => new Intl.DateTimeFormat('en-CA', {
   day: '2-digit'
 }).format(new Date());
 
+// グラフとタイムラインを同時に描画せず、画面幅の変更にも追従する。
+function useMobileLayout() {
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 700px)').matches);
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 700px)');
+    const update = () => setIsMobile(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  return isMobile;
+}
+
+function HistoryTimeline({ logs }: { logs: HistoryLog[] }) {
+  const [visibleCount, setVisibleCount] = useState(12);
+  const groups = new Map<string, HistoryLog[]>();
+  [...logs].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id).forEach((log) => {
+    // 09:10〜09:19の記録を09:10の枠にまとめる（切り捨て）。
+    const minute = log.createdAt.slice(0, 15) + '0';
+    const group = groups.get(minute) ?? [];
+    group.push(log);
+    groups.set(minute, group);
+  });
+  const entries = [...groups.entries()];
+
+  return (
+    <div className="history-timeline">
+      <p className="timeline-caption">新しい記録から表示 · 日本時間 · 10分ごとに記録をまとめています</p>
+      {entries.length === 0 ? (
+        <p className="empty-history">表示するサービスがありません。カードの目のボタンで表示できます。</p>
+      ) : (
+        <>
+          <ol className="timeline-list" aria-label="稼働履歴タイムライン">
+            {entries.slice(0, visibleCount).map(([minute, records]) => (
+              <li key={minute} className="timeline-group">
+                <h3><time dateTime={minute.replace(' ', 'T') + ':00Z'}>
+                  {new Date(minute.replace(' ', 'T') + ':00Z').toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' })}
+                </time></h3>
+                <ul className="timeline-records">
+                  {records.map((log) => (
+                    <li key={log.id} className={`timeline-record ${log.status === 'up' ? 'up' : 'down'}`}>
+                      <div className="timeline-record-heading">
+                        <span className="timeline-service">{log.target}</span>
+                        <span className={`status-badge ${log.status === 'up' ? 'up' : 'down'}`}>
+                          {log.status === 'up' ? <CheckCircle2 size={16} aria-hidden="true" /> : <XCircle size={16} aria-hidden="true" />}
+                          {log.status === 'up' ? '正常' : 'エラー'}
+                        </span>
+                      </div>
+                      <div className="timeline-metrics">
+                        <span>応答時間 <strong>{log.status === 'up' && log.responseTimeMs != null ? `${log.responseTimeMs.toLocaleString('ja-JP')} ms` : '—'}</strong></span>
+                        <span>HTTP {log.statusCode ?? '—'}</span>
+                      </div>
+                      {log.error && <details className="timeline-error"><summary>エラー詳細</summary><p>{log.error}</p></details>}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ol>
+          {visibleCount < entries.length && (
+            <button type="button" className="timeline-more" onClick={() => setVisibleCount((count) => count + 12)}>以前の記録を表示</button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function App() {
+  const isMobile = useMobileLayout();
   const today = todayInJapan();
   const [initialChartFilters] = useState(() => loadChartFilters(today));
   const [results, setResults] = useState<CheckResult[]>([]);
@@ -474,9 +543,9 @@ function App() {
                       <button
                         type="button"
                         className={`chart-toggle ${isChartVisible ? 'active' : ''}`}
-                        aria-label={isChartVisible ? `${result.target}をグラフから非表示にする` : `${result.target}をグラフに表示する`}
+                        aria-label={isChartVisible ? `${result.target}を履歴から非表示にする` : `${result.target}を履歴に表示する`}
                         aria-pressed={isChartVisible}
-                        title={isChartVisible ? 'グラフに表示中' : 'グラフから非表示'}
+                        title={isChartVisible ? '履歴に表示中' : '履歴から非表示'}
                         onClick={() => toggleChartTarget(result.target)}
                       >
                         {isChartVisible ? <Eye size={16} /> : <EyeOff size={16} />}
@@ -527,7 +596,7 @@ function App() {
 
             <div className="chart-container">
               <div className="chart-header">
-                <h2>Response Time History</h2>
+                <h2>{isMobile ? '稼働履歴タイムライン' : 'Response Time History'}</h2>
                 <div className="date-range-selector">
                   <label>
                     日付
@@ -544,7 +613,12 @@ function App() {
                   </label>
                 </div>
               </div>
-              {chartData.length > 0 ? (
+              {chartData.length > 0 ? (isMobile ? (
+                <HistoryTimeline
+                  key={`${selectedDate}/${startTime}/${endTime}/${[...hiddenChartTargets].sort().join(',')}`}
+                  logs={filteredHistory.filter((log) => !hiddenChartTargets.has(log.target))}
+                />
+              ) : (
                 <div className="chart-wrapper">
                   <div className="chart-failure-key"><span />応答エラーあり</div>
                   <ResponsiveContainer width="100%" height="100%">
@@ -594,7 +668,7 @@ function App() {
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
-              ) : (
+              )) : (
                 <div className="empty-history">選択した期間の履歴データはありません。</div>
               )}
             </div>
