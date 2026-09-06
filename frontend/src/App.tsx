@@ -590,7 +590,7 @@ function App() {
 
             <div className="chart-container">
               <div className="chart-header">
-                <h2>{isMobile ? '応答時間の縦グラフ' : 'Response Time History'}</h2>
+                <h2>Response Time History</h2>
                 <div className="date-range-selector">
                   <label>
                     日付
@@ -609,7 +609,6 @@ function App() {
               </div>
               {chartData.length > 0 ? (
                 <>
-                {isMobile && <p className="vertical-chart-caption">縦軸：時刻（日本時間・新しい順）／横軸：応答時間（ms）<br />上下にスクロールし、グラフをタップすると詳細を確認できます。</p>}
                 <div className={`chart-wrapper${isMobile ? ' vertical-chart' : ''}`} style={isMobile ? { height: Math.max(480, displayChartData.length * 48 + 140) } : undefined}>
                   <div className="chart-failure-key"><span />応答エラーあり</div>
                   <ResponsiveContainer width="100%" height="100%">
