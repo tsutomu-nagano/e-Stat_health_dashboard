@@ -223,6 +223,14 @@ h1 {
 }
 
 .chart-tooltip-time { margin-bottom: 0.6rem; color: var(--text-muted); font-weight: 600; }
+.chart-tooltip-mobile {
+  position: fixed;
+  z-index: 1000;
+  min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+}
 .chart-tooltip-item + .chart-tooltip-item { margin-top: 0.65rem; padding-top: 0.65rem; border-top: 1px solid var(--card-border); }
 .chart-tooltip-service { display: flex; align-items: center; gap: 0.4rem; font-weight: 600; }
 .chart-tooltip-color { width: 0.55rem; height: 0.55rem; flex: 0 0 auto; border-radius: 50%; }
@@ -251,4 +259,20 @@ h1 {
   .date-range-selector { width: 100%; flex-wrap: wrap; }
   .card-grid { grid-template-columns: 1fr; }
   .chart-wrapper { height: 360px; }
+}
+
+.vertical-chart-caption { color: var(--text-muted); font-size: 0.85rem; line-height: 1.7; margin-bottom: 1rem; }
+.vertical-chart .chart-failure-key { right: 0; }
+.vertical-chart .chart-tooltip { min-width: 0; width: min(260px, calc(100vw - 80px)); }
+button:focus-visible, summary:focus-visible { outline: 2px solid #60a5fa; outline-offset: 3px; }
+
+@media (max-width: 700px) {
+  .chart-container { padding: 1rem; }
+  .chart-header { width: 100%; }
+  .date-range-selector { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .date-range-selector label { min-width: 0; flex-direction: column; align-items: stretch; }
+  .date-range-selector label:first-child { grid-column: 1 / -1; }
+  .date-range-selector input { width: 100%; min-width: 0; min-height: 44px; font-size: 1rem; }
+  .date-range-selector > span { display: none; }
+  .details-btn, .chart-toggle, .move-btn { width: 44px; height: 44px; }
 }

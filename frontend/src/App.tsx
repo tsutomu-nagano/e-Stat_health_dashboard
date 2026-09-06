@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Activity, RefreshCcw, CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronUp, Eye, EyeOff, ArrowLeft, ArrowRight } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceArea, ReferenceLine } from 'recharts';
 
@@ -141,8 +142,50 @@ function StatusDot({ cx, cy, payload, target, color }: any) {
   return <circle cx={cx} cy={cy} r={4} fill={color} stroke="#ffffff" strokeWidth={1} />;
 }
 
-function ChartTooltip({ active, payload, label, targets }: any) {
+function ChartTooltip({ active, payload, label, targets, coordinate, isMobile }: any) {
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
   const point = payload?.[0]?.payload;
+
+  useLayoutEffect(() => {
+    if (!isMobile || !active || !point) return;
+    const updatePosition = () => {
+      const chart = anchorRef.current?.closest('.recharts-wrapper');
+      const tooltip = tooltipRef.current;
+      if (!chart || !tooltip) return;
+      const viewport = window.visualViewport;
+      const left = (viewport?.offsetLeft ?? 0) + 8;
+      const top = (viewport?.offsetTop ?? 0) + 8;
+      const width = Math.max(0, (viewport?.width ?? window.innerWidth) - 16);
+      const height = Math.max(0, (viewport?.height ?? window.innerHeight) - 16);
+      tooltip.style.maxHeight = `${height}px`;
+      tooltip.style.width = `${Math.min(280, width)}px`;
+      const bounds = chart.getBoundingClientRect();
+      const anchorY = bounds.top + (coordinate?.y ?? 0);
+      const tooltipHeight = tooltip.getBoundingClientRect().height;
+      // 下側に収まらなければ上側へ移動し、最後に表示領域内へ収める。
+      const preferredY = anchorY + 12 + tooltipHeight <= top + height
+        ? anchorY + 12
+        : anchorY - 12 - tooltipHeight;
+      tooltip.style.top = `${Math.max(top, Math.min(preferredY, top + height - tooltipHeight))}px`;
+      tooltip.style.left = `${Math.max(left, Math.min(bounds.left, left + width - tooltip.offsetWidth))}px`;
+    };
+    updatePosition();
+    const observer = new ResizeObserver(updatePosition);
+    if (tooltipRef.current) observer.observe(tooltipRef.current);
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+    window.visualViewport?.addEventListener('resize', updatePosition);
+    window.visualViewport?.addEventListener('scroll', updatePosition);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+      window.visualViewport?.removeEventListener('resize', updatePosition);
+      window.visualViewport?.removeEventListener('scroll', updatePosition);
+    };
+  }, [isMobile, active, point, coordinate?.y]);
+
   if (!active || !point) return null;
 
   const failedTargets = Object.keys(point)
@@ -150,8 +193,8 @@ function ChartTooltip({ active, payload, label, targets }: any) {
     .map((key) => key.slice(0, -'Status'.length));
   const items = Array.from(new Set<string>([...(targets ?? []), ...failedTargets]));
 
-  return (
-    <div className="chart-tooltip">
+  const content = (
+    <div ref={tooltipRef} className={`chart-tooltip${isMobile ? ' chart-tooltip-mobile' : ''}`}>
       <div className="chart-tooltip-time">{label}</div>
       {items.map((target: string) => {
         const hasData = Object.prototype.hasOwnProperty.call(point, `${target}Status`);
@@ -179,6 +222,9 @@ function ChartTooltip({ active, payload, label, targets }: any) {
       })}
     </div>
   );
+  return isMobile
+    ? <><span ref={anchorRef} />{createPortal(content, document.body)}</>
+    : content;
 }
 const todayInJapan = () => new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Asia/Tokyo',
@@ -187,7 +233,21 @@ const todayInJapan = () => new Intl.DateTimeFormat('en-CA', {
   day: '2-digit'
 }).format(new Date());
 
+// 画面幅の変更に合わせてグラフの向きを切り替える。
+function useMobileLayout() {
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 700px)').matches);
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 700px)');
+    const update = () => setIsMobile(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  return isMobile;
+}
+
 function App() {
+  const isMobile = useMobileLayout();
   const today = todayInJapan();
   const [initialChartFilters] = useState(() => loadChartFilters(today));
   const [results, setResults] = useState<CheckResult[]>([]);
@@ -318,7 +378,7 @@ function App() {
   [...filteredHistory].reverse().forEach(log => {
     const logDate = new Date(log.createdAt + 'Z');
     const coeff = 1000 * 60 * 10;
-    const roundedDate = new Date(Math.round(logDate.getTime() / coeff) * coeff);
+    const roundedDate = new Date((isMobile ? Math.floor(logDate.getTime() / coeff) : Math.round(logDate.getTime() / coeff)) * coeff);
     const time = roundedDate.toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' });
 
     if (!chartDataMap.has(time)) {
@@ -334,6 +394,9 @@ function App() {
   });
 
   const chartData = Array.from(chartDataMap.values());
+  const displayChartData = isMobile
+    ? [...chartData].sort((a, b) => String(b.time).localeCompare(String(a.time)))
+    : chartData;
   const downTimes = new Set(
     chartData
       .filter((point) => Object.keys(point).some(
@@ -474,9 +537,9 @@ function App() {
                       <button
                         type="button"
                         className={`chart-toggle ${isChartVisible ? 'active' : ''}`}
-                        aria-label={isChartVisible ? `${result.target}をグラフから非表示にする` : `${result.target}をグラフに表示する`}
+                        aria-label={isChartVisible ? `${result.target}を履歴から非表示にする` : `${result.target}を履歴に表示する`}
                         aria-pressed={isChartVisible}
-                        title={isChartVisible ? 'グラフに表示中' : 'グラフから非表示'}
+                        title={isChartVisible ? '履歴に表示中' : '履歴から非表示'}
                         onClick={() => toggleChartTarget(result.target)}
                       >
                         {isChartVisible ? <Eye size={16} /> : <EyeOff size={16} />}
@@ -545,23 +608,23 @@ function App() {
                 </div>
               </div>
               {chartData.length > 0 ? (
-                <div className="chart-wrapper">
+                <>
+                <div className={`chart-wrapper${isMobile ? ' vertical-chart' : ''}`} style={isMobile ? { height: Math.max(480, displayChartData.length * 48 + 140) } : undefined}>
                   <div className="chart-failure-key"><span />応答エラーあり</div>
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData} margin={{ top: 20, right: 30, left: 8, bottom: 0 }}>
+                    <LineChart data={displayChartData} layout={isMobile ? 'vertical' : 'horizontal'} margin={isMobile ? { top: 30, right: 20, left: 0, bottom: 16 } : { top: 20, right: 30, left: 8, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                      <XAxis dataKey="time" stroke="#94a3b8" tick={{ fill: '#94a3b8' }} />
-                      <YAxis width={88} stroke="#94a3b8" tick={{ fill: '#94a3b8' }} unit="ms" />
-                      {chartData.map((point, index) => {
+                      <XAxis type={isMobile ? 'number' : 'category'} dataKey={isMobile ? undefined : 'time'} orientation={isMobile ? 'top' : 'bottom'} stroke="#94a3b8" tick={{ fill: '#94a3b8', fontSize: isMobile ? 11 : 12 }} tickCount={isMobile ? 3 : undefined} />
+                      <YAxis type={isMobile ? 'category' : 'number'} dataKey={isMobile ? 'time' : undefined} interval={isMobile ? 0 : undefined} width={isMobile ? 52 : 88} stroke="#94a3b8" tick={{ fill: '#94a3b8', fontSize: 12 }} unit={isMobile ? undefined : 'ms'} />
+                      {displayChartData.map((point, index) => {
                         const time = String(point.time);
                         if (!downTimes.has(time)) return null;
 
-                        const nextTime = chartData[index + 1]?.time;
+                        const nextTime = displayChartData[index + 1]?.time;
                         return nextTime != null ? (
                           <ReferenceArea
                             key={`down-${time}`}
-                            x1={time}
-                            x2={String(nextTime)}
+                            {...(isMobile ? { y1: time, y2: String(nextTime) } : { x1: time, x2: String(nextTime) })}
                             fill="#ef4444"
                             fillOpacity={0.24}
                             strokeOpacity={0}
@@ -569,15 +632,15 @@ function App() {
                         ) : (
                           <ReferenceLine
                             key={`down-${time}`}
-                            x={time}
+                            {...(isMobile ? { y: time } : { x: time })}
                             stroke="#ef4444"
                             strokeOpacity={0.36}
                             strokeWidth={16}
                           />
                         );
                       })}
-                      <Tooltip content={(props) => <ChartTooltip {...props} targets={tooltipTargets} />} />
-                      <Legend />
+                      <Tooltip position={isMobile ? { x: 0 } : undefined} content={<ChartTooltip targets={tooltipTargets} isMobile={isMobile} />} />
+                      <Legend verticalAlign={isMobile ? "top" : "bottom"} wrapperStyle={isMobile ? { paddingBottom: 16, fontSize: 12 } : undefined} />
                       {chartTargets.map((target, index) => (
                         <Line
                           key={target}
@@ -594,6 +657,7 @@ function App() {
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
+                </>
               ) : (
                 <div className="empty-history">選択した期間の履歴データはありません。</div>
               )}
