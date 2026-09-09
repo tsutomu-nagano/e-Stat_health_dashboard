@@ -53,8 +53,9 @@ const loadChartFilters = (today: string): ChartFilters => {
 
     const parsed: unknown = JSON.parse(stored);
     if (!parsed || typeof parsed !== 'object') return defaults;
-    const filters = parsed as Partial<ChartFilters>;
+    const filters = parsed as Partial<ChartFilters> & { savedOn?: string };
     if (
+      filters.savedOn !== today ||
       !isValidDate(filters.selectedDate, today) ||
       !isValidTime(filters.startTime) ||
       !isValidTime(filters.endTime) ||
@@ -336,7 +337,9 @@ function App() {
   }, [hiddenChartTargets]);
 
   useEffect(() => {
-    window.localStorage.setItem(CHART_FILTERS_KEY, JSON.stringify({ selectedDate, startTime, endTime }));
+    window.localStorage.setItem(CHART_FILTERS_KEY, JSON.stringify({
+      selectedDate, startTime, endTime, savedOn: todayInJapan()
+    }));
   }, [selectedDate, startTime, endTime]);
 
   useEffect(() => {
